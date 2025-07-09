@@ -1,9 +1,15 @@
 fastapi
 uvicorn
 pydantic
+pydantic-settings
 sentence-transformers
 faiss-cpu
 numpy
 python-dotenv
 sqlalchemy
 asyncpg
+transformers
+psycopg2-binary
+requests
+newspaper3k
+lxml[html_clean]

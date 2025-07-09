@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+from pydantic_settings import BaseSettings
 
 # Load environment variables from .env file
 load_dotenv()
@@ -62,3 +63,19 @@ def test_database_connection():
     else:
         print("Could not establish database connection")
         return False
+
+class Settings(BaseSettings):
+    NEWS_API_KEY: str = None
+    bart_api_token: str = None
+    user: str = None
+    password: str = None
+    host: str = None
+    port: str = None
+    dbname: str = None
+    DATABASE_URL: str = None
+
+    class Config:
+        env_file = ".env"
+        extra = "allow"  # Allow extra fields in the .env file
+
+settings = Settings()
