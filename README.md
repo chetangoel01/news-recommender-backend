@@ -1,138 +1,161 @@
-# News Summarizer and Embedding Pipeline
+# News Recommender Backend
 
-This application ingests news articles in real-time, summarizes them using a transformer model, and stores the summaries along with semantic embeddings in a vector database. These embeddings support semantic search, personalized recommendations, and content discovery.
+A privacy-first news recommendation system with local ML computation, user authentication, and personalized content delivery. Built with FastAPI, PostgreSQL, and pgvector for scalable semantic search.
 
----
+## 🚀 Features
 
-## Technology Stack
+- **Privacy-First Architecture**: ML computations run locally on user devices
+- **User Authentication**: JWT-based auth with secure token management  
+- **Personalized Recommendations**: Vector-based content matching with user embeddings
+- **Semantic Search**: pgvector-powered similarity search across news articles
+- **Real-time Sync**: Efficient embedding updates from local device computation
+- **Production Ready**: Comprehensive test suite with PostgreSQL integration
 
-- **Summarization**: [`facebook/bart-large-cnn`](https://huggingface.co/facebook/bart-large-cnn), hosted via Hugging Face Spaces (FastAPI)
-- **Embeddings**: [`all-MiniLM-L6-v2`](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) from `sentence-transformers`
-- **Storage**: Supabase (PostgreSQL with `pgvector`)
-- **News Extraction**: NewsAPI and `newspaper3k`
+## 🏗️ Technology Stack
 
----
+- **Backend**: FastAPI with async support
+- **Database**: PostgreSQL with pgvector extension (Supabase)
+- **Authentication**: JWT tokens with bcrypt password hashing
+- **ML/Embeddings**: sentence-transformers (`all-MiniLM-L6-v2`)
+- **Testing**: pytest with production database testing
+- **Deployment**: Containerized with Docker support
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-. 📂 app/
-│
-├── 📂 api/                         # FastAPI routes & API logic
-│   ├── 📄 main.py                  # FastAPI app setup
+news-recommender-backend/
+├── 📂 api/                    # FastAPI routes & endpoints
+│   ├── 📄 main.py            # FastAPI app configuration  
 │   └── 📂 routes/
-│       ├── 📄 __init__.py
-│       ├── 📄 articles.py
-│       └── 📄 users.py
+│       ├── 📄 auth.py        # Authentication endpoints
+│       └── 📄 users.py       # User profile & embedding endpoints
 │
-├── 📂 pipeline/                    # Summarization, embeddings, indexing
-│   ├── 📄 summarize.py
-│   ├── 📄 embed.py
-│   └── 📂 embeddings/
-│       ├── 📄 article_index.faiss
+├── 📂 core/                   # Core business logic
+│   ├── 📄 auth.py            # Authentication & JWT handling
+│   ├── 📄 db.py              # Database connection & session management
+│   ├── 📄 models.py          # SQLAlchemy models
+│   ├── 📄 schemas.py         # Pydantic schemas for API
+│   └── 📄 config.py          # Configuration & settings
 │
-├── 📂 core/                        # Shared code for DB, models, logic
-│   ├── 📄 db.py                    # Supabase or pgvector interface
-│   ├── 📄 models.py                # Pydantic/ORM models
-│   ├── 📄 recommender.py          # Vector search, similarity, ranking
-│   └── 📄 config.py               # API keys, constants
+├── 📂 tests/                  # Comprehensive test suite
+│   ├── 📄 test_auth.py       # Authentication tests
+│   ├── 📄 test_users.py      # User profile & embedding tests
+│   └── 📄 conftest.py        # Test configuration & fixtures
 │
-├── 📄 requirements.txt
-└── 📄 README.md
-````
-
----
-
-## Workflow Overview
-
-### 1. Fetch Articles
-- Retrieves top headlines from NewsAPI
-- Extracts full article text using `newspaper3k`
-
-### 2. Summarize
-- Sends article text to a Hugging Face-hosted FastAPI summarization endpoint
-- Applies chunked summarization for long-form content
-- Summaries are approximately 1,000 characters in length
-
-### 3. Store in Supabase
-- Inserts metadata and summaries into a Supabase PostgreSQL database
-- Duplicate URLs are ignored to prevent reprocessing
-
-### 4. Generate Embeddings
-- Uses `all-MiniLM-L6-v2` to produce a 384-dimensional vector for each summary
-- Stores the vector in a `pgvector` column for similarity search and recommendation
-
----
-
-## Supabase Table Schema
-
-```sql
-CREATE TABLE summaries (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  url text UNIQUE,
-  title text,
-  summary text,
-  raw_text text,
-  source text,
-  embedding float8[],
-  created_at timestamp with time zone DEFAULT now()
-);
-````
-
-> Ensure the `pgvector` extension is enabled in your Supabase project.
-
----
-
-## Usage
-
-### Run summarization and store new articles:
-
-```bash
-python summarize.py
+├── 📂 docs/                   # Comprehensive documentation
+├── 📂 scripts/                # Utility scripts (currently empty)
+├── 📂 pipeline/               # News processing pipeline
+└── 📂 assets/                 # Architecture diagrams
 ```
 
-### Generate embeddings for stored summaries:
+## 📚 Documentation
 
+This project has comprehensive documentation organized in the [`docs/`](./docs/) folder:
+
+- **[📖 Documentation Index](./docs/README.md)** - Start here for complete documentation overview
+- **[🔐 Authentication Guide](./docs/README_AUTH.md)** - Setup JWT auth, user management  
+- **[📊 API Documentation](./docs/API_DOCUMENTATION.md)** - Complete API reference with examples
+- **[🗄️ Database Schema](./docs/DATABASE_SCHEMA.md)** - PostgreSQL schema with pgvector setup
+- **[🧪 Testing Guide](./docs/TESTING_GUIDE.md)** - Production-grade testing with PostgreSQL
+- **[🛣️ Implementation Roadmap](./docs/IMPLEMENTATION_ROADMAP.md)** - Project timeline & features
+
+## ⚡ Quick Start
+
+### 1. Prerequisites
+- Python 3.12+
+- PostgreSQL with pgvector extension (or Supabase account)
+- Virtual environment tool
+
+### 2. Installation
 ```bash
-python embed.py
+# Clone and setup
+git clone <repository>
+cd news-recommender-backend
+python -m venv venv
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
+pip install -r requirements.txt
 ```
 
+### 3. Environment Setup
+```bash
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your database credentials and secret key
+```
+
+### 4. Database Setup
+```bash
+# Database tables are created automatically by the application
+# Verify setup by running tests
+python run_tests.py check
+```
+
+### 5. Run Development Server
+```bash
+# Start the API server
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# API will be available at http://localhost:8000
+# Interactive docs at http://localhost:8000/docs
+```
+
+### 6. Run Tests
+```bash
+# Run full test suite
+make test
+
+# Or run specific test categories
+python run_tests.py auth     # Authentication tests
+python run_tests.py users    # User profile tests  
+python run_tests.py all      # All tests
+```
+
+## 🏛️ Architecture
+
+This system implements a **privacy-first recommendation architecture**:
+
+1. **Local ML Computation**: User devices compute embeddings locally
+2. **Selective Sync**: Only aggregated embeddings sent to server (~every 10 articles)
+3. **Server-Side Matching**: Fast vector similarity search with pgvector
+4. **Personalized Delivery**: Recommendations based on user interest vectors
+
+```
+[User Device]     [API Backend]      [Database]
+     │                  │                 │
+     ├─ Local ML ────── ├─ Auth/Users ─── ├─ PostgreSQL
+     ├─ Reading ─────── ├─ Embeddings ─── ├─ pgvector
+     └─ Privacy ─────── └─ Recommendations └─ Vector Search
+```
+
+## 🧪 Testing
+
+The project features **production-grade testing** with 43 comprehensive tests:
+
+- ✅ **Authentication Flow**: Registration, login, token management
+- ✅ **User Profiles**: Profile management and preferences  
+- ✅ **Embedding Updates**: Local ML computation workflow
+- ✅ **Database Integration**: Real PostgreSQL with pgvector
+- ✅ **API Endpoints**: Complete request/response testing
+
+```bash
+# Check current test status
+make test
+# Expected: 43 passed, minimal warnings
+```
+
+## 🚢 Deployment
+
+Ready for production deployment with:
+- Docker containerization support
+- Environment-based configuration
+- Production database compatibility
+- Comprehensive monitoring endpoints
+- Security best practices implemented
+
+## 📄 License
+
+[Add your license here]
+
 ---
 
-## Model Details
-
-### Summarization: `facebook/bart-large-cnn`
-
-* Transformer-based abstractive summarizer
-* Token limit: 1024
-* Chunked summarization is used for longer inputs
-* Deployed via Hugging Face Spaces (FastAPI)
-
-### Embedding: `all-MiniLM-L6-v2`
-
-* 384-dimensional output
-* Optimized for sentence-level semantic similarity
-* Lightweight and suitable for CPU inference
-
----
-
-## Applications
-
-* Semantic search
-* Personalized news recommendations
-* Topic clustering
-* Content deduplication and similarity scoring
-
----
-
-## Deployment Overview
-
-| Component         | Host                | Description                             |
-| ----------------- | ------------------- | --------------------------------------- |
-| Summarization API | Hugging Face Spaces | Summarization service for article text  |
-| Embedding Engine  | Render or local     | CPU-based semantic embedding generation |
-| Database          | Supabase            | Vectorized storage and metadata         |
-
----
-
-This system enables vectorized news summarization and retrieval pipelines that scale across devices and platforms, without requiring GPU hosting or local heavy inference.
+**Next Steps**: Check the [📖 Documentation Index](./docs/README.md) for detailed guides on authentication, API usage, database setup, and testing workflows.
