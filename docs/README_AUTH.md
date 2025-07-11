@@ -23,13 +23,9 @@ SECRET_KEY=your-super-secret-key-change-in-production
 DEBUG=true
 ```
 
-### 3. Create Database Tables
+### 3. Start the Server
 
-```bash
-python create_tables.py
-```
-
-### 4. Start the Server
+Database tables are created automatically by the application.
 
 ```bash
 uvicorn api.main:app --reload --host 0.0.0.0 --port 8000

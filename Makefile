@@ -8,7 +8,7 @@ help:
 	@echo ""
 	@echo "Setup & Installation:"
 	@echo "  install     - Install Python dependencies"
-	@echo "  setup       - Set up database tables"
+	@echo "  setup       - Verify database setup"
 	@echo "  dev         - Start development server"
 	@echo ""
 	@echo "Testing:"
@@ -27,7 +27,8 @@ install:
 	pip install -r requirements.txt
 
 setup:
-	python create_tables.py
+	@echo "Database tables are created automatically by the application"
+	@echo "Run 'make test' to verify setup"
 
 dev:
 	uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
