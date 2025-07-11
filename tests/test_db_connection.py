@@ -19,6 +19,12 @@ from core.config import test_database_connection, get_database_connection
 from core.db import SessionLocal
 from sqlalchemy import text
 
+def test_database_connection():
+    """Test basic database connection"""
+    from core.config import test_database_connection as test_db_conn
+    success = test_db_conn()
+    assert success, "Database connection should succeed"
+
 
 def mask_database_url(database_url: str) -> str:
     if "@" in database_url and "://" in database_url:

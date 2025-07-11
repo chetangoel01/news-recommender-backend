@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, validator
+from pydantic import BaseModel, EmailStr, field_validator, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from uuid import UUID
@@ -18,13 +18,13 @@ class UserRegister(BaseModel):
     display_name: str
     preferences: Optional[UserPreferences] = None
 
-    @validator('password')
+    @field_validator('password')
     def validate_password(cls, v):
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         return v
 
-    @validator('username')
+    @field_validator('username')
     def validate_username(cls, v):
         if len(v) < 3:
             raise ValueError('Username must be at least 3 characters long')
@@ -82,8 +82,7 @@ class UserProfileResponse(BaseModel):
     articles_read: int
     preferences: Optional[Dict[str, Any]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class UserProfileUpdate(BaseModel):
     display_name: Optional[str] = None
@@ -112,7 +111,7 @@ class UserEmbeddingUpdateRequest(BaseModel):
     device_type: str
     app_version: str
 
-    @validator('embedding_vector')
+    @field_validator('embedding_vector')
     def validate_embedding_vector(cls, v):
         if len(v) != 384:
             raise ValueError('Embedding vector must be 384-dimensional')

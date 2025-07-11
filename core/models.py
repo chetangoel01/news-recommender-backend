@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, Text, DateTime, Boolean, Integer, Float, 
 from sqlalchemy.dialects.postgresql import UUID, ARRAY, FLOAT
 from sqlalchemy.orm import relationship
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from core.db import Base
 
 # Import pgvector vector type
@@ -54,7 +54,7 @@ class Article(Base):
     url = Column(Text, nullable=False, unique=True)
     url_to_image = Column(Text)
     published_at = Column(DateTime)
-    fetched_at = Column(DateTime, default=datetime.utcnow)
+    fetched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     language = Column(String(10), default="en")
     category = Column(String(50))
     tags = Column(ARRAY(String))
@@ -83,7 +83,7 @@ class Bookmark(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     article_id = Column(UUID(as_uuid=True), ForeignKey("articles.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     notes = Column(Text)
     
     # Relationships
@@ -102,7 +102,7 @@ class UserEmbeddingUpdate(Base):
     articles_processed = Column(Integer, nullable=False)
     device_type = Column(String(20))
     app_version = Column(String(20))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user = relationship("User", back_populates="embedding_updates")
