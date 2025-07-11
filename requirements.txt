@@ -15,3 +15,14 @@ requests
 newspaper3k
 lxml[html_clean]
 SQLAlchemy
+# Authentication dependencies
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart
+email-validator
+# Testing dependencies
+pytest
+pytest-asyncio
+httpx
+pytest-mock
+pytest-cov
