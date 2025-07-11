@@ -190,6 +190,12 @@ $RECYCLE.BIN/
 .coverage
 htmlcov/
 
+# Testing specific
+test.db
+test.db-*
+pytest_report.html
+.testmondata
+
 # Hugging Face specific
 .cache/
 transformers_cache/

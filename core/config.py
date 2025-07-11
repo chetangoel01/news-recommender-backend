@@ -78,14 +78,27 @@ def test_database_connection():
         return False
 
 class Settings(BaseSettings):
+    # News API settings
     NEWS_API_KEY: str | None = None
     bart_api_token: str | None = None
+    
+    # Database settings
     user: str | None = None
     password: str | None = None
     host: str | None = None
     port: str | None = None
     dbname: str | None = None
     DATABASE_URL: str | None = None
+    
+    # Authentication settings
+    SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-please")
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
+    
+    # Application settings
+    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+    CORS_ORIGINS: list = ["*"]  # Configure properly for production
 
     class Config:
         env_file = ".env"
