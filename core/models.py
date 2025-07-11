@@ -3,6 +3,15 @@ from sqlalchemy.dialects.postgresql import UUID, ARRAY, FLOAT
 import uuid
 from core.db import Base
 
+# Import pgvector vector type
+try:
+    from pgvector.sqlalchemy import Vector
+    HAS_PGVECTOR = True
+except ImportError:
+    HAS_PGVECTOR = False
+    # Fallback to ARRAY if pgvector not available
+    Vector = lambda dim: ARRAY(FLOAT)
+
 class Article(Base):
     __tablename__ = "articles"
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -19,4 +28,4 @@ class Article(Base):
     fetched_at = Column(DateTime)
     language = Column(String)
     category = Column(String)
-    embedding = Column(ARRAY(FLOAT))  # Store semantic embedding as float array
+    embedding = Column(Vector(384))  # Store semantic embedding as pgvector
