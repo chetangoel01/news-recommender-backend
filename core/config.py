@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 
 # Load environment variables from .env file
 load_dotenv()
@@ -100,8 +101,6 @@ class Settings(BaseSettings):
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
     CORS_ORIGINS: list = ["*"]  # Configure properly for production
 
-    class Config:
-        env_file = ".env"
-        extra = "allow"  # Allow extra fields in the .env file
+    model_config = ConfigDict(env_file=".env", extra="allow")
 
 settings = Settings()

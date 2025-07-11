@@ -7,6 +7,12 @@ import os
 import socket
 from core.config import DatabaseConfig, test_database_connection
 
+def test_database_connection():
+    """Test basic database connection"""
+    from core.config import test_database_connection as test_db_conn
+    success = test_db_conn()
+    assert success, "Database connection should succeed"
+
 def test_host_resolution():
     """Test how the host resolves (IPv4 vs IPv6)"""
     host = DatabaseConfig.HOST
@@ -23,18 +29,21 @@ def test_host_resolution():
             ip_address = sockaddr[0]
             print(f"  {ip_version}: {ip_address}")
             
-        # Check if IPv4 is available
+        # Check if any addresses are available (IPv4 or IPv6)
         ipv4_addresses = [addr for addr in addresses if addr[0] == socket.AF_INET]
+        ipv6_addresses = [addr for addr in addresses if addr[0] == socket.AF_INET6]
+        
         if ipv4_addresses:
             print(f"\n✅ IPv4 addresses available: {len(ipv4_addresses)}")
-            return True
-        else:
-            print("\n❌ No IPv4 addresses found")
-            return False
+        elif ipv6_addresses:
+            print(f"\n✅ IPv6 addresses available: {len(ipv6_addresses)}")
+        
+        # Assert that some addresses are available
+        assert len(addresses) > 0, "No addresses found for host"
             
     except Exception as e:
         print(f"❌ Error resolving host: {e}")
-        return False
+        assert False, f"Error resolving host: {e}"
 
 def test_connection_with_ipv4_preference():
     """Test connection with IPv4 preference enabled"""
@@ -43,13 +52,14 @@ def test_connection_with_ipv4_preference():
     # Set environment variable to force IPv4
     os.environ["FORCE_IPV4"] = "true"
     
-    # Test the connection
-    success = test_database_connection()
+    # Test the connection  
+    from core.config import test_database_connection as test_db_conn
+    success = test_db_conn()
     
     # Clean up
     os.environ.pop("FORCE_IPV4", None)
     
-    return success
+    assert success, "IPv4 preference connection should succeed"
 
 def main():
     print("=== Supabase IPv4 Connection Test ===")

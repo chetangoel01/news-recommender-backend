@@ -34,7 +34,7 @@ async def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
     """
     try:
         # Convert Pydantic model to dict for processing
-        user_dict = user_data.dict()
+        user_dict = user_data.model_dump()
         
         # Create the user
         db_user = create_user(db, user_dict)

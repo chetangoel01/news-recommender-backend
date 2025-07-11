@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from core.db import get_db
 from core.auth import get_current_active_user
@@ -65,7 +65,7 @@ async def update_user_profile(
         current_user.preferences = updated_prefs
     
     # Update last active timestamp
-    current_user.last_active = datetime.utcnow()
+    current_user.last_active = datetime.now(timezone.utc)
     
     try:
         db.commit()
@@ -105,7 +105,7 @@ async def update_user_embedding(
         db_embedding_update = UserEmbeddingUpdate(
             user_id=current_user.id,
             embedding_vector=embedding_update.embedding_vector,
-            interaction_summary=embedding_update.interaction_summary.dict(),
+            interaction_summary=embedding_update.interaction_summary.model_dump(),
             session_start=embedding_update.session_start,
             session_end=embedding_update.session_end,
             articles_processed=embedding_update.articles_processed,
@@ -136,7 +136,7 @@ async def update_user_embedding(
             )
         
         # Update last active timestamp
-        current_user.last_active = datetime.utcnow()
+        current_user.last_active = datetime.now(timezone.utc)
         
         # Save to database
         db.add(db_embedding_update)
