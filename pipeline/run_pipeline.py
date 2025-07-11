@@ -18,8 +18,17 @@ logging.basicConfig(
 )
 
 
-def get_full_content(url, api_content=None):
-    """Extract full article content using newspaper3k, fallback to API content if needed"""
+def get_full_content(url, api_content=None, api_description=None):
+    """
+    Extract full article content using newspaper3k, fallback to API content if needed.
+    If newspaper content is over 20k characters, use News API fields instead.
+    
+    Returns:
+        tuple: (content, summary, use_api_fields)
+        - content: The article content to use
+        - summary: The summary to use (None if should be generated)
+        - use_api_fields: Boolean indicating if we're using API fields
+    """
     try:
         logging.info(f"Fetching full content from: {url}")
         news_article = NewsArticle(url)
@@ -27,18 +36,32 @@ def get_full_content(url, api_content=None):
         news_article.parse()
         
         if news_article.text:
-            logging.info(f"Successfully extracted {len(news_article.text)} characters")
-            return news_article.text
+            content_length = len(news_article.text)
+            logging.info(f"Successfully extracted {content_length} characters")
+            
+            # If content is over 20k characters, use News API fields instead
+            if content_length > 20000:
+                logging.info(f"Content too long ({content_length} chars), using News API fields")
+                if api_content and api_description:
+                    return api_content, api_description, True
+                elif api_content:
+                    return api_content, None, True
+                else:
+                    # Truncate newspaper content if no API fallback
+                    truncated_content = news_article.text[:20000] + "..."
+                    return truncated_content, None, False
+            
+            return news_article.text, None, False
         else:
             logging.warning(f"No text content found for: {url}")
-            return None
+            return None, None, False
     except Exception as e:
         logging.error(f"Failed to fetch full content for {url}: {e}")
         # Fallback to API content if available
         if api_content:
             logging.info(f"Using API content as fallback for: {url}")
-            return f"[API_CONTENT_FALLBACK] {api_content}"
-        return None
+            return f"[API_CONTENT_FALLBACK] {api_content}", api_description, True
+        return None, None, False
 
 
 def run_pipeline(use_cache=True, force_refresh=False):
@@ -74,17 +97,24 @@ def run_pipeline(use_cache=True, force_refresh=False):
             
         # Get full article content using newspaper3k, with API content as fallback
         api_content = item.get("content", "")
-        full_content = get_full_content(item.get("url"), api_content)
+        api_description = item.get("description", "")
+        full_content, api_summary, use_api_fields = get_full_content(item.get("url"), api_content, api_description)
         if not full_content:
             logging.warning(f"Skipping article - could not extract any content: {item.get('title', 'No Title')}")
             continue
         
-        try:
-            # Use the full content for summarization
-            summary = summarize(full_content)
-        except Exception as e:
-            logging.error(f"Failed to summarize article '{item.get('title', 'No Title')}': {e}")
-            continue
+        # Determine summary to use
+        if use_api_fields and api_summary:
+            # Use News API description as summary
+            summary = api_summary
+            logging.info(f"Using News API description as summary for: {item.get('title', 'No Title')}")
+        else:
+            # Generate summary from content
+            try:
+                summary = summarize(full_content)
+            except Exception as e:
+                logging.error(f"Failed to summarize article '{item.get('title', 'No Title')}': {e}")
+                continue
 
         # Generate semantic embedding for the article
         try:

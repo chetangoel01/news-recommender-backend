@@ -1,18 +1,40 @@
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from .config import DatabaseConfig
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
+# Use DATABASE_URL from environment
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL is not set in environment")
 
 # Create SQLAlchemy engine
-DATABASE_URL = f"postgresql://{DatabaseConfig.USER}:{DatabaseConfig.PASSWORD}@{DatabaseConfig.HOST}:{DatabaseConfig.PORT}/{DatabaseConfig.DBNAME}"
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={
+        "connect_timeout": 15,
+        "application_name": "news-recommender-backend",
+        "keepalives_idle": 60,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+        "sslmode": "require",  # Important for Supabase-hosted Postgres
+    },
+    pool_pre_ping=True,
+    pool_recycle=300
+)
 
-engine = create_engine(DATABASE_URL)
+# Session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# Create base class for models
+# Base model
 Base = declarative_base()
 
-# Dependency to get database session
+# Dependency to get DB session (e.g. in FastAPI)
 def get_db():
     db = SessionLocal()
     try:

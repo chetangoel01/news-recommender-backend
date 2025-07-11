@@ -14,17 +14,26 @@ class DatabaseConfig:
     HOST: str = os.getenv("host", "localhost")
     PORT: str = os.getenv("port", "5432")
     DBNAME: str = os.getenv("dbname", "postgres")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", None)
     
     @classmethod
     def get_connection_params(cls) -> dict:
         """Get connection parameters for psycopg2"""
-        return {
+        if cls.DATABASE_URL:
+            return {'dsn': cls.DATABASE_URL}
+        params = {
             'user': cls.USER,
             'password': cls.PASSWORD,
             'host': cls.HOST,
             'port': cls.PORT,
-            'dbname': cls.DBNAME
+            'dbname': cls.DBNAME,
+            'connect_timeout': 15,
+            'application_name': 'news-recommender-backend',
+            'keepalives_idle': 60,
+            'keepalives_interval': 10,
+            'keepalives_count': 5
         }
+        return params
 
 # Database connection function
 def get_database_connection():
@@ -35,7 +44,11 @@ def get_database_connection():
     import psycopg2
     
     try:
-        connection = psycopg2.connect(**DatabaseConfig.get_connection_params())
+        params = DatabaseConfig.get_connection_params()
+        if 'dsn' in params:
+            connection = psycopg2.connect(params['dsn'])
+        else:
+            connection = psycopg2.connect(**params)
         return connection
     except Exception as e:
         print(f"Failed to connect to database: {e}")
@@ -65,14 +78,14 @@ def test_database_connection():
         return False
 
 class Settings(BaseSettings):
-    NEWS_API_KEY: str = None
-    bart_api_token: str = None
-    user: str = None
-    password: str = None
-    host: str = None
-    port: str = None
-    dbname: str = None
-    DATABASE_URL: str = None
+    NEWS_API_KEY: str | None = None
+    bart_api_token: str | None = None
+    user: str | None = None
+    password: str | None = None
+    host: str | None = None
+    port: str | None = None
+    dbname: str | None = None
+    DATABASE_URL: str | None = None
 
     class Config:
         env_file = ".env"

@@ -5,6 +5,7 @@ pydantic-settings
 sentence-transformers
 faiss-cpu
 numpy
+pgvector
 python-dotenv
 sqlalchemy
 asyncpg
@@ -13,3 +14,4 @@ psycopg2-binary
 requests
 newspaper3k
 lxml[html_clean]
+SQLAlchemy
