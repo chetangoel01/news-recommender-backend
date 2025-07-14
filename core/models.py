@@ -31,8 +31,8 @@ class User(Base):
     last_active = Column(DateTime, nullable=True, server_default=func.now(), index=True)
     
     # App-specific fields
-    preferences = Column(JSON, nullable=True)
-    embedding = Column(Vector(384), nullable=True)  # 384-dimensional user interest embedding
+    preferences = Column(JSON, nullable=True)  # JSONB in actual database
+    embedding = Column(Vector(384), nullable=True)  # 384-dimensional user interest embedding (USER-DEFINED type)
     articles_read = Column(Integer, nullable=True, default=0)
     engagement_score = Column(Float, nullable=True, default=0.0)
     
@@ -43,10 +43,11 @@ class User(Base):
 class Article(Base):
     __tablename__ = "articles"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    source_id = Column(String)
-    source_name = Column(String, nullable=False)
-    author = Column(String)
+    # Match the actual database schema provided by the user
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    source_id = Column(Text)
+    source_name = Column(Text, nullable=False)
+    author = Column(Text)
     title = Column(Text, nullable=False)
     description = Column(Text)
     content = Column(Text)
@@ -54,36 +55,36 @@ class Article(Base):
     url = Column(Text, nullable=False, unique=True)
     url_to_image = Column(Text)
     published_at = Column(DateTime)
-    fetched_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    language = Column(String(10), default="en")
-    category = Column(String(50))
-    tags = Column(ARRAY(String))
-    
-    # Content metadata
-    read_time_minutes = Column(Integer)
-    difficulty_level = Column(String(20))
-    content_type = Column(String(20), default="article")  # article, video, podcast
-    moderation_status = Column(String(20), default="approved")
+    fetched_at = Column(DateTime, server_default=func.current_timestamp())
+    language = Column(Text)
+    category = Column(Text)
     
     # Engagement metrics
     views = Column(Integer, default=0)
     likes = Column(Integer, default=0)
     shares = Column(Integer, default=0)
     bookmarks = Column(Integer, default=0)
-    read_time_avg_seconds = Column(Float, default=0.0)
-    completion_rate = Column(Float, default=0.0)
-    trending_score = Column(Float, default=0.0)
     
     # Semantic embedding for recommendations
-    embedding = Column(Vector(384))  # 384-dimensional semantic embedding
+    embedding = Column(Vector(384))  # 384-dimensional semantic embedding (USER-DEFINED type in DB)
+    
+    # These columns don't exist in the actual database yet
+    # tags = Column(ARRAY(String))
+    # read_time_minutes = Column(Integer)
+    # difficulty_level = Column(String(20))
+    # content_type = Column(String(20), default="article")
+    # moderation_status = Column(String(20), default="approved")
+    # read_time_avg_seconds = Column(Float, default=0.0)
+    # completion_rate = Column(Float, default=0.0)
+    # trending_score = Column(Float, default=0.0)
 
 class Bookmark(Base):
     __tablename__ = "bookmarks"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     article_id = Column(UUID(as_uuid=True), ForeignKey("articles.id"), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, server_default=func.now())
     notes = Column(Text)
     
     # Relationships
@@ -93,16 +94,16 @@ class Bookmark(Base):
 class UserEmbeddingUpdate(Base):
     __tablename__ = "user_embedding_updates"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(UUID(as_uuid=True), primary_key=True, nullable=False)  # No default in actual DB
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
-    embedding_vector = Column(Vector(384))  # 384-dimensional vector
+    embedding_vector = Column(Vector(384))  # 384-dimensional vector (USER-DEFINED type)
     interaction_summary = Column(JSON)  # Store interaction summary as JSON
     session_start = Column(DateTime, nullable=False)
     session_end = Column(DateTime, nullable=False)
     articles_processed = Column(Integer, nullable=False)
-    device_type = Column(String(20))
-    app_version = Column(String(20))
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    device_type = Column(String)  # character varying in DB
+    app_version = Column(String)  # character varying in DB
+    created_at = Column(DateTime, nullable=True)  # nullable in actual DB
     
     # Relationships
     user = relationship("User", back_populates="embedding_updates")

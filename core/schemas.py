@@ -131,6 +131,109 @@ class EmbeddingStatusResponse(BaseModel):
     embedding_version: str
     local_computation_config: Dict[str, Any]
 
+# Article Schemas
+class ArticleSource(BaseModel):
+    id: Optional[str] = None
+    name: str
+    logo: Optional[str] = None
+    credibility_score: Optional[float] = None
+
+class ArticleEngagement(BaseModel):
+    views: int
+    likes: int
+    shares: int
+    user_liked: Optional[bool] = False
+    user_bookmarked: Optional[bool] = False
+
+class ArticleSummary(BaseModel):
+    id: UUID
+    title: str
+    summary: Optional[str] = None
+    content_preview: Optional[str] = None
+    url: str
+    image_url: Optional[str] = None
+    source: ArticleSource
+    author: Optional[str] = None
+    published_at: Optional[datetime] = None
+    category: Optional[str] = None
+    language: Optional[str] = None
+    read_time_minutes: Optional[int] = None
+    engagement: ArticleEngagement
+    relevance_score: Optional[float] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ArticleDetail(BaseModel):
+    id: UUID
+    title: str
+    summary: Optional[str] = None
+    content: Optional[str] = None
+    url: str
+    image_url: Optional[str] = None
+    source: ArticleSource
+    author: Optional[str] = None
+    published_at: Optional[datetime] = None
+    fetched_at: Optional[datetime] = None
+    category: Optional[str] = None
+    language: Optional[str] = None
+    tags: Optional[List[str]] = []
+    read_time_minutes: Optional[int] = None
+    engagement: ArticleEngagement
+    related_articles: Optional[List[Dict[str, Any]]] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ArticlesResponse(BaseModel):
+    articles: List[ArticleSummary]
+    total: int
+    page: int
+    has_more: bool
+    next_cursor: Optional[str] = None
+
+class ArticleViewRequest(BaseModel):
+    view_duration_seconds: float
+    percentage_read: Optional[int] = None
+    interaction_type: Optional[str] = None
+    swipe_direction: Optional[str] = None
+
+class ArticleViewResponse(BaseModel):
+    tracked: bool
+    updated_recommendations: bool
+
+class BookmarkResponse(BaseModel):
+    bookmarked: bool
+    bookmark_id: Optional[UUID] = None
+    reading_list_count: int
+
+class BookmarkItem(BaseModel):
+    bookmark_id: UUID
+    article: ArticleSummary
+    bookmarked_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class BookmarksResponse(BaseModel):
+    bookmarks: List[BookmarkItem]
+    total: int
+    page: int
+    has_more: bool
+
+class LikeResponse(BaseModel):
+    liked: bool
+    total_likes: int
+    user_engagement_updated: Optional[bool] = True
+
+class ShareRequest(BaseModel):
+    platform: Optional[str] = None
+    message: Optional[str] = None
+    include_summary: Optional[bool] = True
+
+class ShareResponse(BaseModel):
+    shared: bool
+    share_url: str
+    total_shares: int
+    share_id: UUID
+
 # Error Response Schema
 class ErrorDetail(BaseModel):
     field: Optional[str] = None

@@ -6,6 +6,8 @@ sentence-transformers
 faiss-cpu
 numpy
 pgvector
+schedule
+tqdm
 python-dotenv
 sqlalchemy
 asyncpg
