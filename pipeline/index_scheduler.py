@@ -2,15 +2,18 @@
 """
 FAISS Index Scheduler - Automated maintenance for article embeddings index
 
-This script handles automated updates to the FAISS index based on different triggers:
-- Time-based updates (hourly, daily)
-- Database change detection
-- Manual triggers via API
+NOTE: NOT CURRENTLY USED IN API ENDPOINTS
 
-Usage:
-    python -m pipeline.index_scheduler --mode hourly
-    python -m pipeline.index_scheduler --mode daily  
-    python -m pipeline.index_scheduler --mode on-demand
+This script is kept for potential future integration when article scale
+exceeds pgvector performance limits. Currently, the API uses direct
+pgvector similarity search which automatically stays in sync.
+
+This script handles automated updates to the FAISS index based on different triggers:
+1. Time-based updates (e.g., every hour)
+2. Article count thresholds (e.g., every 100 new articles)
+3. Manual triggers via API
+
+For future integration, this would run as a background service.
 """
 
 import argparse

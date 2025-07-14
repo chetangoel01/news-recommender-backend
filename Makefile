@@ -12,13 +12,14 @@ help:
 	@echo "  dev         - Start development server"
 	@echo ""
 	@echo "Testing:"
-	@echo "  test        - Run all tests"
-	@echo "  test-auth   - Run authentication tests only"
-	@echo "  test-users  - Run user profile tests only"
-	@echo "  test-cov    - Run tests with coverage report"
-	@echo "  test-fast   - Run tests without coverage (faster)"
+	@echo "  test           - Run all tests"
+	@echo "  test-auth      - Run authentication tests only"
+	@echo "  test-users     - Run user profile tests only"
+	@echo "  test-articles  - Run content management tests only"
+	@echo "  test-cov       - Run tests with coverage report"
+	@echo "  test-fast      - Run tests without coverage (faster)"
 	@echo ""
-	@echo "FAISS Index Management:"
+	@echo "FAISS Index Management (OPTIONAL - not used in current API):"
 	@echo "  index-build    - Build complete FAISS index from database"
 	@echo "  index-update   - Incrementally update FAISS index"
 	@echo "  index-cleanup  - Remove deleted articles from index"
@@ -28,7 +29,7 @@ help:
 	@echo "Cleanup:"
 	@echo "  clean       - Clean up test artifacts and cache"
 	@echo "  clean-db    - Remove test database files"
-	@echo "  clean-index - Remove FAISS index files"
+	@echo "  clean-index    - Remove FAISS index files (optional cleanup)"
 
 # Installation and setup
 install:
@@ -51,13 +52,17 @@ test-auth:
 test-users:
 	python run_tests.py users
 
+test-articles:
+	python run_tests.py articles
+
 test-cov:
 	python run_tests.py coverage
 
 test-fast:
 	python run_tests.py fast
 
-# FAISS Index Management targets
+# FAISS Index Management targets (OPTIONAL - not used in current API endpoints)
+# These are kept for potential future integration when article scale exceeds pgvector limits
 index-build:
 	python -m pipeline.build_faiss_index
 

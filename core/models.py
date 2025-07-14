@@ -37,6 +37,8 @@ class User(Base):
     engagement_score = Column(Float, nullable=True, default=0.0)
     
     # Relationships
+    likes = relationship("Like", back_populates="user", cascade="all, delete-orphan")
+    shares = relationship("Share", back_populates="user", cascade="all, delete-orphan")
     bookmarks = relationship("Bookmark", back_populates="user", cascade="all, delete-orphan")
     embedding_updates = relationship("UserEmbeddingUpdate", back_populates="user", cascade="all, delete-orphan")
 
@@ -78,6 +80,34 @@ class Article(Base):
     # completion_rate = Column(Float, default=0.0)
     # trending_score = Column(Float, default=0.0)
 
+class Like(Base):
+    __tablename__ = "likes"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    article_id = Column(UUID(as_uuid=True), ForeignKey("articles.id"), nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="likes")
+    article = relationship("Article")
+
+class Share(Base):
+    __tablename__ = "shares"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    article_id = Column(UUID(as_uuid=True), ForeignKey("articles.id"), nullable=False)
+    platform = Column(String, nullable=True)  # e.g., 'twitter', 'facebook', 'email', 'copy_link'
+    message = Column(Text, nullable=True)  # Optional user message with the share
+    count = Column(Integer, default=1, nullable=False)  # Number of times this user shared this article
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="shares")
+    article = relationship("Article")
+
 class Bookmark(Base):
     __tablename__ = "bookmarks"
     
@@ -94,7 +124,7 @@ class Bookmark(Base):
 class UserEmbeddingUpdate(Base):
     __tablename__ = "user_embedding_updates"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, nullable=False)  # No default in actual DB
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=func.gen_random_uuid())
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     embedding_vector = Column(Vector(384))  # 384-dimensional vector (USER-DEFINED type)
     interaction_summary = Column(JSON)  # Store interaction summary as JSON
@@ -103,7 +133,7 @@ class UserEmbeddingUpdate(Base):
     articles_processed = Column(Integer, nullable=False)
     device_type = Column(String)  # character varying in DB
     app_version = Column(String)  # character varying in DB
-    created_at = Column(DateTime, nullable=True)  # nullable in actual DB
+    created_at = Column(DateTime, nullable=True, default=lambda: datetime.now(timezone.utc), server_default=func.now())
     
     # Relationships
     user = relationship("User", back_populates="embedding_updates")

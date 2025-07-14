@@ -143,6 +143,7 @@ class ArticleEngagement(BaseModel):
     likes: int
     shares: int
     user_liked: Optional[bool] = False
+    user_shared: Optional[bool] = False
     user_bookmarked: Optional[bool] = False
 
 class ArticleSummary(BaseModel):
@@ -180,6 +181,18 @@ class ArticleDetail(BaseModel):
     read_time_minutes: Optional[int] = None
     engagement: ArticleEngagement
     related_articles: Optional[List[Dict[str, Any]]] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class ArticlePreview(BaseModel):
+    """Lightweight article schema for previews and similar article listings."""
+    id: UUID
+    title: str
+    summary: Optional[str] = None
+    image_url: Optional[str] = None
+    source: ArticleSource
+    published_at: Optional[datetime] = None
+    category: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

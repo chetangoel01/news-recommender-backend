@@ -14,25 +14,20 @@ from pathlib import Path
 def check_database_config():
     """Check if database configuration is properly set up."""
     database_url = os.getenv("DATABASE_URL")
-    test_database_url = os.getenv("TEST_DATABASE_URL")
     
     if not database_url:
         print("❌ ERROR: DATABASE_URL environment variable is not set")
-        print("   Please set your PostgreSQL connection string:")
-        print("   export DATABASE_URL='postgresql://user:pass@host:5432/dbname'")
+        print("   Please set: export DATABASE_URL='postgresql://user:pass@host:5432/db'")
         return False
     
     if not database_url.startswith("postgresql://"):
-        print(f"❌ ERROR: DATABASE_URL must be a PostgreSQL connection string")
+        print(f"❌ ERROR: Database URL must be a PostgreSQL connection string")
         print(f"   Current value starts with: {database_url.split('://')[0]}://")
         print("   Expected: postgresql://...")
         return False
     
     print(f"✅ Database configuration looks good")
-    if test_database_url:
-        print(f"✅ Separate test database configured")
-    else:
-        print(f"ℹ️  Using production database with '_test' suffix for testing")
+    print(f"🔒 SAFE: Only test-created records (tracked by UUID) will be deleted")
     
     return True
 
@@ -102,9 +97,10 @@ USAGE:
     python run_tests.py <command>
 
 COMMANDS:
-    all          Run all tests (auth + users + integration)
+    all          Run all tests (auth + users + articles + integration)
     auth         Run authentication tests only  
     users        Run user profile tests only
+    articles     Run content management tests only
     coverage     Run all tests with coverage report
     fast         Run tests without coverage (faster)
     verbose      Run tests with verbose output
@@ -119,8 +115,17 @@ EXAMPLES:
 
 REQUIREMENTS:
     - PostgreSQL database with pgvector extension
-    - DATABASE_URL environment variable set
+    - Either TEST_DATABASE_URL (recommended) or DATABASE_URL environment variable set
     - All dependencies installed (pip install -r requirements.txt)
+
+DATABASE OPTIONS:
+    TEST_DATABASE_URL - Use separate test database (recommended for isolation)
+    DATABASE_URL      - Use production database with safe test cleanup
+                       (Only test-created records tracked by UUID will be deleted)
+
+SAFETY OPTIONS:
+    TEST_DRY_RUN=true - Show what would be deleted without actually deleting
+                       (Useful for verifying safety with production database)
 
 For more information, see TESTING_GUIDE.md
 """)
@@ -165,6 +170,10 @@ def main():
         "users": {
             "cmd": base_cmd + ["tests/test_users.py", "-v", "-m", "users"],
             "desc": "Running user profile tests"
+        },
+        "articles": {
+            "cmd": base_cmd + ["tests/test_articles.py", "-v", "-m", "articles"],
+            "desc": "Running content management tests"
         },
         "coverage": {
             "cmd": base_cmd + [

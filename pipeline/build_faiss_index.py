@@ -1,4 +1,14 @@
 # pipeline/build_faiss_index.py
+#
+# FAISS Index Builder - NOT CURRENTLY USED IN API ENDPOINTS
+# 
+# This module is kept for potential future integration when article scale
+# exceeds pgvector performance limits (>100k articles). Currently, the API 
+# uses direct pgvector similarity search for better simplicity and performance
+# at the current scale (~3k articles).
+#
+# To use FAISS index in the future, integrate this with a similarity service.
+
 import logging
 import numpy as np
 import faiss
@@ -29,7 +39,7 @@ def build_faiss_index():
         article_ids = []
         
         for article in articles:
-            if article.embedding:
+            if article.embedding is not None and len(article.embedding) > 0:
                 # Convert list back to numpy array
                 embedding_array = np.array(article.embedding, dtype=np.float32)
                 embeddings.append(embedding_array)
