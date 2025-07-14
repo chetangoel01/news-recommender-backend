@@ -1,5 +1,6 @@
 import pytest
 import asyncio
+import logging
 from typing import Generator, Dict, Any
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, text
@@ -9,17 +10,34 @@ from datetime import datetime
 import os
 import json
 
+# Configure logging for tests
+logger = logging.getLogger(__name__)
+
+def register_test_data(db_session, table_name: str, record_id: str):
+    """Register a test data ID for safe cleanup. 
+    
+    Call this function whenever you create test data in your tests:
+    register_test_data(db_session, 'users', str(user.id))
+    register_test_data(db_session, 'articles', str(article.id))
+    """
+    if hasattr(db_session, '_test_data_tracker'):
+        db_session._test_data_tracker[table_name].add(record_id)
+        logger.debug(f"Registered {table_name} ID {record_id} for cleanup")
+
 from api.main import app
 from core.db import get_db, Base
 from core.models import User, Article, Bookmark, UserEmbeddingUpdate
 from core.auth import get_password_hash
 
-# Test database URL - use same database as production for development testing
-# For production environments, set TEST_DATABASE_URL to a separate test database
-TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL") or os.getenv("DATABASE_URL")
+# Test database URL - ALWAYS use a separate test database to avoid data loss
+TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
 
 if not TEST_DATABASE_URL:
-    raise ValueError("TEST_DATABASE_URL or DATABASE_URL must be set for testing")
+    raise ValueError(
+        "TEST_DATABASE_URL must be set to a SEPARATE test database! "
+        "NEVER use the production DATABASE_URL for testing as it will delete your data. "
+        "Set TEST_DATABASE_URL to a different database (e.g., add '_test' suffix to your database name)"
+    )
 
 # Create test engine with PostgreSQL
 engine = create_engine(
@@ -72,32 +90,51 @@ def db_session(setup_test_db):
     """Create a fresh database session for each test."""
     session = TestingSessionLocal()
     
+    # Track test data IDs for safe cleanup
+    test_data_tracker = {
+        'users': set(),
+        'articles': set(),
+        'bookmarks': set(),
+        'user_embedding_updates': set()
+    }
+    
+    # Make tracker available to the session
+    session._test_data_tracker = test_data_tracker
+    
     yield session
     
-    # Clean up: delete only test data from tables after each test
+    # Clean up: delete ONLY the exact records created during this test
     try:
         session.rollback()
-        # Delete in reverse dependency order to avoid foreign key conflicts
-        # Only delete test data (users with @example.com emails) to avoid affecting real data
-        session.execute(text("DELETE FROM user_embedding_updates WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com')"))
-        session.execute(text("DELETE FROM bookmarks WHERE user_id IN (SELECT id FROM users WHERE email LIKE '%@example.com')"))
-        session.execute(text("DELETE FROM articles WHERE title LIKE 'Test %' OR url LIKE '%test%'"))
-        session.execute(text("DELETE FROM users WHERE email LIKE '%@example.com'"))
+        
+        # Delete in reverse dependency order using exact IDs only
+        if test_data_tracker['user_embedding_updates']:
+            ids_str = "'" + "','".join(str(id) for id in test_data_tracker['user_embedding_updates']) + "'"
+            session.execute(text(f"DELETE FROM user_embedding_updates WHERE id IN ({ids_str})"))
+        
+        if test_data_tracker['bookmarks']:
+            ids_str = "'" + "','".join(str(id) for id in test_data_tracker['bookmarks']) + "'"
+            session.execute(text(f"DELETE FROM bookmarks WHERE id IN ({ids_str})"))
+        
+        if test_data_tracker['articles']:
+            ids_str = "'" + "','".join(str(id) for id in test_data_tracker['articles']) + "'"
+            session.execute(text(f"DELETE FROM articles WHERE id IN ({ids_str})"))
+        
+        if test_data_tracker['users']:
+            ids_str = "'" + "','".join(str(id) for id in test_data_tracker['users']) + "'"
+            session.execute(text(f"DELETE FROM users WHERE id IN ({ids_str})"))
+        
         session.commit()
+        
+        total_deleted = sum(len(ids) for ids in test_data_tracker.values())
+        if total_deleted > 0:
+            logger.info(f"Test cleanup: deleted {total_deleted} test records by exact ID")
+            
     except Exception as e:
-        # If targeted DELETE fails, try broader cleanup
-        try:
-            session.rollback()
-            # Still be careful and only delete test data
-            session.execute(text("DELETE FROM user_embedding_updates WHERE created_at > NOW() - INTERVAL '1 hour'"))
-            session.execute(text("DELETE FROM bookmarks WHERE created_at > NOW() - INTERVAL '1 hour'"))
-            session.execute(text("DELETE FROM articles WHERE title LIKE 'Test %'"))
-            session.execute(text("DELETE FROM users WHERE email LIKE '%@example.com'"))
-            session.commit()
-        except Exception:
-            session.rollback()
-            # Last resort: just rollback and continue
-            pass
+        # If cleanup fails, log the error but don't attempt any other cleanup
+        session.rollback()
+        logger.error(f"Test cleanup failed: {e}")
+        logger.error("CRITICAL: Test data may not have been cleaned up properly")
     finally:
         session.close()
 
@@ -155,6 +192,10 @@ def test_user_in_db(db_session, test_user_data) -> User:
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
+    
+    # Register this user ID for exact cleanup
+    if hasattr(db_session, '_test_data_tracker'):
+        db_session._test_data_tracker['users'].add(str(user.id))
     
     return user
 
@@ -216,9 +257,9 @@ def invalid_auth_headers() -> Dict[str, str]:
 def test_article_data() -> Dict[str, Any]:
     """Test article data for testing."""
     return {
-        "title": "Test Article",
+        "title": "Test Article for Unit Testing",  # Matches safer cleanup pattern
         "summary": "This is a test article summary",
-        "url": "https://example.com/test-article",
+        "url": "https://test-example.com/article-123",  # Matches safer cleanup pattern
         "source_name": "Test Source",
         "category": "technology",
         "embedding": [0.5] * 384  # 384-dimensional vector
@@ -239,5 +280,9 @@ def test_article_in_db(db_session, test_article_data) -> Article:
     db_session.add(article)
     db_session.commit()
     db_session.refresh(article)
+    
+    # Register this article ID for exact cleanup
+    if hasattr(db_session, '_test_data_tracker'):
+        db_session._test_data_tracker['articles'].add(str(article.id))
     
     return article 

@@ -1,21 +1,33 @@
 # pipeline/run_pipeline.py
+
+# Suppress all warnings BEFORE any imports
+import os
+import warnings
+os.environ['TRANSFORMERS_VERBOSITY'] = 'error'
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+warnings.filterwarnings("ignore")
+
 import logging
 import numpy as np
+from tqdm import tqdm
 from pipeline.fetch import fetch_articles
 from pipeline.summarize import summarize
 from pipeline.embed import generate_article_embedding
 from core.models import Article
 from core.db import SessionLocal
-from datetime import datetime
+from datetime import datetime, timezone
 from newspaper import Article as NewsArticle
 
-# Configure logging
+# Configure logging to only show critical errors
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.CRITICAL,
     format='%(asctime)s [%(levelname)s] %(message)s',
-    # Reduce logging overhead
     force=True
 )
+
+# Suppress urllib3 warnings
+import urllib3
+urllib3.disable_warnings()
 
 
 def get_full_content(url, api_content=None, api_description=None):
@@ -30,18 +42,15 @@ def get_full_content(url, api_content=None, api_description=None):
         - use_api_fields: Boolean indicating if we're using API fields
     """
     try:
-        logging.info(f"Fetching full content from: {url}")
         news_article = NewsArticle(url)
         news_article.download()
         news_article.parse()
         
         if news_article.text:
             content_length = len(news_article.text)
-            logging.info(f"Successfully extracted {content_length} characters")
             
             # If content is over 20k characters, use News API fields instead
             if content_length > 20000:
-                logging.info(f"Content too long ({content_length} chars), using News API fields")
                 if api_content and api_description:
                     return api_content, api_description, True
                 elif api_content:
@@ -53,10 +62,9 @@ def get_full_content(url, api_content=None, api_description=None):
             
             return news_article.text, None, False
         else:
-            logging.warning(f"No text content found for: {url}")
             return None, None, False
     except Exception as e:
-        logging.error(f"Failed to fetch full content for {url}: {e}")
+        # Silently handle errors - they'll be caught by the progress bar status
         # Fallback to API content if available
         if api_content:
             logging.info(f"Using API content as fallback for: {url}")
@@ -72,91 +80,137 @@ def run_pipeline(use_cache=True, force_refresh=False):
         use_cache: Whether to use cached articles if available
         force_refresh: Whether to force refresh and ignore cache
     """
-    logging.info("Starting news pipeline...")
     session = SessionLocal()
     try:
+        print("🚀 Starting news pipeline...")
         articles = fetch_articles(use_cache=use_cache, force_refresh=force_refresh)
-        logging.info(f"Fetched {len(articles)} articles from NewsAPI.")
+        print(f"📰 Loaded {len(articles)} articles for processing")
     except Exception as e:
-        logging.error(f"Failed to fetch articles: {e}")
+        print(f"❌ Failed to fetch articles: {e}")
         return
     
     processed_count = 0
     skipped_count = 0
+    error_count = 0
     
-    for item in articles:
-        if not item.get("url"):
-            logging.warning(f"Skipping article with missing URL: {item.get('title', 'No Title')}")
-            continue
+    # Create progress bar
+    progress_bar = tqdm(
+        articles, 
+        desc="Processing articles",
+        unit="article",
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}]"
+    )
+    
+    for item in progress_bar:
+        title = item.get('title', 'Untitled')[:50] + "..." if len(item.get('title', '')) > 50 else item.get('title', 'Untitled')
         
-        # Check if article already exists in database
-        existing_article = session.query(Article).filter(Article.url == item.get("url")).first()
-        if existing_article:
-            skipped_count += 1
-            continue
+        try:
+            if not item.get("url"):
+                progress_bar.set_postfix_str(f"⚠️  Skipping: No URL")
+                error_count += 1
+                continue
             
-        # Get full article content using newspaper3k, with API content as fallback
-        api_content = item.get("content", "")
-        api_description = item.get("description", "")
-        full_content, api_summary, use_api_fields = get_full_content(item.get("url"), api_content, api_description)
-        if not full_content:
-            logging.warning(f"Skipping article - could not extract any content: {item.get('title', 'No Title')}")
-            continue
-        
-        # Determine summary to use
-        if use_api_fields and api_summary:
-            # Use News API description as summary
-            summary = api_summary
-            logging.info(f"Using News API description as summary for: {item.get('title', 'No Title')}")
-        else:
-            # Generate summary from content
+            # Update status: Checking for duplicates
+            progress_bar.set_postfix_str(f"🔍 Checking: {title}")
+            
+            # Check if article already exists in database
+            existing_article = session.query(Article).filter(Article.url == item.get("url")).first()
+            if existing_article:
+                skipped_count += 1
+                progress_bar.set_postfix_str(f"⏭️  Skipped: Already exists")
+                continue
+                
+            # Update status: Fetching content
+            progress_bar.set_postfix_str(f"📄 Fetching: {title}")
+            
+            # Get full article content using newspaper3k, with API content as fallback
+            api_content = item.get("content", "")
+            api_description = item.get("description", "")
+            full_content, api_summary, use_api_fields = get_full_content(item.get("url"), api_content, api_description)
+            
+            if not full_content or len(full_content.strip()) < 100:
+                progress_bar.set_postfix_str(f"⚠️  Skipping: Too short")
+                error_count += 1
+                continue
+            
+            # Update status: Processing content
+            progress_bar.set_postfix_str(f"📝 Processing: {title}")
+            
+            # Determine summary to use
+            if use_api_fields and api_summary:
+                summary = api_summary
+            else:
+                # Generate summary from content
+                try:
+                    summary = summarize(full_content)
+                except Exception as e:
+                    progress_bar.set_postfix_str(f"⚠️  Summary failed: {title}")
+                    error_count += 1
+                    continue
+
+            # Update status: Generating embedding
+            progress_bar.set_postfix_str(f"🧠 Embedding: {title}")
+            
+            # Generate semantic embedding for the article
             try:
-                summary = summarize(full_content)
+                embedding = generate_article_embedding(
+                    title=item.get('title', ''),
+                    summary=summary,
+                    content=full_content
+                )
+                if embedding is None:
+                    progress_bar.set_postfix_str(f"⚠️  Embedding failed: {title}")
+                    error_count += 1
+                    continue
             except Exception as e:
-                logging.error(f"Failed to summarize article '{item.get('title', 'No Title')}': {e}")
+                progress_bar.set_postfix_str(f"⚠️  Embedding error: {title}")
+                error_count += 1
                 continue
 
-        # Generate semantic embedding for the article
-        try:
-            embedding = generate_article_embedding(
-                title=item.get('title', ''),
+            # Update status: Saving to database
+            progress_bar.set_postfix_str(f"💾 Saving: {title}")
+            
+            article = Article(
+                source_id=item["source"]["id"] if item["source"] else None,
+                source_name=item["source"]["name"] if item["source"] else None,
+                author=item.get("author"),
+                title=item.get("title"),
+                description=item.get("description"),
+                content=full_content,  # Use the full content (either newspaper3k or API fallback)
                 summary=summary,
-                content=full_content
+                url=item.get("url"),
+                url_to_image=item.get("urlToImage"),
+                published_at=item.get("publishedAt"),
+                fetched_at=datetime.now(timezone.utc),
+                embedding=embedding.tolist() if embedding is not None else None,  # Convert numpy array to list for storage
             )
-            if embedding is None:
-                logging.warning(f"Failed to generate embedding for: {item.get('title', 'No Title')}")
-        except Exception as e:
-            logging.error(f"Failed to generate embedding for '{item.get('title', 'No Title')}': {e}")
-            embedding = None
 
-        article = Article(
-            source_id=item["source"]["id"] if item["source"] else None,
-            source_name=item["source"]["name"] if item["source"] else None,
-            author=item.get("author"),
-            title=item.get("title"),
-            description=item.get("description"),
-            content=full_content,  # Use the full content (either newspaper3k or API fallback)
-            summary=summary,
-            url=item.get("url"),
-            url_to_image=item.get("urlToImage"),
-            published_at=item.get("publishedAt"),
-            fetched_at=datetime.utcnow(),
-            embedding=embedding.tolist() if embedding is not None else None,  # Convert numpy array to list for storage
-        )
-
-        try:
-            session.add(article)
-            session.commit()
-            processed_count += 1
-            # Log progress every 10 articles to reduce logging overhead
-            if processed_count % 10 == 0:
-                logging.info(f"Processed {processed_count} articles so far...")
+            try:
+                session.add(article)
+                session.commit()
+                processed_count += 1
+                progress_bar.set_postfix_str(f"✅ Saved: {title}")
+            except Exception as e:
+                session.rollback()  # likely a duplicate
+                progress_bar.set_postfix_str(f"⚠️  Save failed: {title}")
+                error_count += 1
+                
         except Exception as e:
-            session.rollback()  # likely a duplicate
-            logging.warning(f"Failed to save article '{article.title}': {e}")
+            # Catch any unexpected errors in the processing loop
+            progress_bar.set_postfix_str(f"❌ Error: {title}")
+            error_count += 1
+            # Silently continue - error is already shown in progress bar
     
     session.close()
-    logging.info(f"Pipeline completed. Processed {processed_count} new articles, skipped {skipped_count} existing articles.")
+    progress_bar.close()
+    
+    # Final summary
+    print(f"\n🎉 Pipeline completed!")
+    print(f"✅ Processed: {processed_count} new articles")
+    print(f"⏭️  Skipped: {skipped_count} existing articles")
+    if error_count > 0:
+        print(f"⚠️  Errors: {error_count} articles failed")
+    print(f"📊 Total: {processed_count + skipped_count + error_count} articles processed")
 
 if __name__ == "__main__":
     import sys

@@ -1,6 +1,6 @@
 # News Recommender Backend Makefile
 
-.PHONY: help install test test-auth test-users test-coverage clean setup dev
+.PHONY: help install test test-auth test-users test-coverage clean setup dev index-build index-update index-schedule
 
 # Default target
 help:
@@ -18,9 +18,17 @@ help:
 	@echo "  test-cov    - Run tests with coverage report"
 	@echo "  test-fast   - Run tests without coverage (faster)"
 	@echo ""
+	@echo "FAISS Index Management:"
+	@echo "  index-build    - Build complete FAISS index from database"
+	@echo "  index-update   - Incrementally update FAISS index"
+	@echo "  index-cleanup  - Remove deleted articles from index"
+	@echo "  index-schedule - Start automated index maintenance"
+	@echo "  index-stats    - Show index and database statistics"
+	@echo ""
 	@echo "Cleanup:"
 	@echo "  clean       - Clean up test artifacts and cache"
 	@echo "  clean-db    - Remove test database files"
+	@echo "  clean-index - Remove FAISS index files"
 
 # Installation and setup
 install:
@@ -49,6 +57,25 @@ test-cov:
 test-fast:
 	python run_tests.py fast
 
+# FAISS Index Management targets
+index-build:
+	python -m pipeline.build_faiss_index
+
+index-update:
+	python -m pipeline.incremental_index_update
+
+index-cleanup:
+	python -m pipeline.incremental_index_update cleanup
+
+index-schedule:
+	python -m pipeline.index_scheduler --mode hourly
+
+index-schedule-daily:
+	python -m pipeline.index_scheduler --mode daily
+
+index-stats:
+	python -m pipeline.index_scheduler --mode on-demand
+
 # Cleanup targets
 clean:
 	rm -rf __pycache__/
@@ -61,6 +88,10 @@ clean:
 clean-db:
 	rm -f test.db
 	rm -f test.db-*
+
+clean-index:
+	rm -rf pipeline/embeddings/
+	rm -rf pipeline/logs/
 
 # Combined targets
 fresh-test: clean test
