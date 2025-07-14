@@ -1,4 +1,13 @@
 # pipeline/incremental_index_update.py
+#
+# FAISS Incremental Index Updates - NOT CURRENTLY USED IN API ENDPOINTS
+# 
+# This module is kept for potential future integration when article scale
+# exceeds pgvector performance limits. Currently, the API uses direct
+# pgvector similarity search which automatically stays in sync with the database.
+#
+# To use FAISS index in the future, integrate this with a similarity service.
+
 import logging
 import numpy as np
 import faiss

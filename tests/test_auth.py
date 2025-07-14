@@ -58,26 +58,16 @@ class TestUserRegistration:
         assert response.status_code == 400
         assert "username" in response.text.lower()
 
-    def test_register_invalid_email(self, client: TestClient, test_user_data: Dict[str, Any]):
-        """Test registration with invalid email."""
+    @pytest.mark.parametrize("field,invalid_value,description", [
+        ("email", "invalid-email", "invalid email format"),
+        ("password", "short", "password too short"),
+        ("username", "ab", "username too short"),
+    ])
+    def test_register_invalid_input(self, client: TestClient, test_user_data: Dict[str, Any], 
+                                   field: str, invalid_value: str, description: str):
+        """Test registration with various invalid inputs."""
         invalid_data = test_user_data.copy()
-        invalid_data["email"] = "invalid-email"
-        
-        response = client.post("/auth/register", json=invalid_data)
-        assert response.status_code == 422
-
-    def test_register_short_password(self, client: TestClient, test_user_data: Dict[str, Any]):
-        """Test registration with short password."""
-        invalid_data = test_user_data.copy()
-        invalid_data["password"] = "short"
-        
-        response = client.post("/auth/register", json=invalid_data)
-        assert response.status_code == 422
-
-    def test_register_short_username(self, client: TestClient, test_user_data: Dict[str, Any]):
-        """Test registration with short username."""
-        invalid_data = test_user_data.copy()
-        invalid_data["username"] = "ab"
+        invalid_data[field] = invalid_value
         
         response = client.post("/auth/register", json=invalid_data)
         assert response.status_code == 422
