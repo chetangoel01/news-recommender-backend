@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>News Recommender API Demo</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <style>
         * {
             margin: 0;
@@ -94,6 +95,24 @@
             gap: 10px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+        }
+
+        /* Google Sign-In button styling */
+        .g_id_signin {
+            margin: 15px 0;
+        }
+
+        .google-auth-info {
+            background: #e8f4fd;
+            border: 1px solid #3498db;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+
+        .google-auth-info h4 {
+            color: #2c3e50;
+            margin-bottom: 10px;
         }
 
         button {
@@ -300,6 +319,7 @@
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('login')">Login</div>
                     <div class="tab" onclick="switchTab('register')">Register</div>
+                    <div class="tab" onclick="switchTab('google')">Google Auth</div>
                 </div>
 
                 <!-- Login Tab -->
@@ -336,6 +356,35 @@
                     <button onclick="register()">Register</button>
                 </div>
 
+                <!-- Google Auth Tab -->
+                <div id="google-tab" class="tab-content">
+                    <div class="google-auth-info">
+                        <h4>🔐 Google Authentication</h4>
+                        <p>Click the button below to sign in with Google. This will create a new user account if you haven't signed in before.</p>
+                    </div>
+                    <div class="form-group">
+                        <div id="g_id_onload"
+                             data-client_id="1037806407817-74m2hjth7i31u2410biova9dsl3ph74l.apps.googleusercontent.com"
+                             data-callback="handleGoogleCredentialResponse"
+                             data-auto_prompt="false"
+                             data-ux_mode="popup">
+                        </div>
+                        <div class="g_id_signin" 
+                             data-type="standard" 
+                             data-size="large" 
+                             data-theme="outline" 
+                             data-text="sign_in_with" 
+                             data-shape="rectangular" 
+                             data-logo_alignment="left">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                            <strong>Status:</strong> <span id="google-auth-status">Ready to authenticate</span>
+                        </p>
+                    </div>
+                </div>
+
                 <div id="auth-status"></div>
                 <div id="user-info" class="user-info hidden"></div>
             </div>
@@ -346,16 +395,93 @@
                 <p style="margin-bottom: 20px; padding: 15px; background: #e8f4fd; border-radius: 8px; border-left: 4px solid #3498db;">
                     <strong>✨ Complete API Demo:</strong> Test all engagement features including likes, shares, bookmarks, and ML personalization! 
                     Features individual user tracking for all interactions (shares are the strongest engagement signal for ML recommendations).
+                    <br><br>
+                    <strong>🆕 Robust Pagination:</strong> Now using composite cursors (score + article ID) to eliminate duplicates between pages and ensure stable ordering!
                 </p>
 
                 <div class="button-group">
                     <button onclick="getArticles()" id="get-articles-btn" disabled>Get Articles</button>
+                    <button onclick="getPersonalizedFeed()" id="get-feed-btn" disabled>🎯 Personalized Feed</button>
+                    <button onclick="getTrendingFeed()" id="get-trending-btn" disabled>🔥 Trending Feed</button>
                     <button onclick="getUserProfile()" id="get-profile-btn" disabled>Get Profile</button>
                     <button onclick="updateProfile()" id="update-profile-btn" disabled>Update Profile</button>
                     <button onclick="getUserBookmarks()" id="get-bookmarks-btn" disabled>My Bookmarks</button>
                     <button onclick="getEmbeddingStatus()" id="get-embedding-btn" disabled>Embedding Status</button>
                     <button onclick="testEmbeddingUpdate()" id="test-embedding-btn" disabled>Test Embedding Update</button>
                     <button onclick="logout()" id="logout-btn" disabled>Logout</button>
+                </div>
+
+                <!-- Feed Filters -->
+                <div id="feed-filters" class="hidden">
+                    <h3>Feed Filters:</h3>
+                    <div style="display: flex; gap: 15px; margin: 15px 0; flex-wrap: wrap;">
+                        <div>
+                            <label for="feed-limit">Limit:</label>
+                            <select id="feed-limit">
+                                <option value="20">20</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="feed-diversify">Diversify:</label>
+                            <select id="feed-diversify">
+                                <option value="true" selected>Yes</option>
+                                <option value="false">No</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="feed-content-type">Content Type:</label>
+                            <select id="feed-content-type">
+                                <option value="mixed" selected>Mixed</option>
+                                <option value="articles">Articles</option>
+                                <option value="videos">Videos</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="feed-cursor">Cursor (for pagination):</label>
+                            <input type="text" id="feed-cursor" placeholder="Leave empty for first page">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trending Feed Filters -->
+                <div id="trending-filters" class="hidden">
+                    <h3>Trending Filters:</h3>
+                    <div style="display: flex; gap: 15px; margin: 15px 0; flex-wrap: wrap;">
+                        <div>
+                            <label for="trending-timeframe">Timeframe:</label>
+                            <select id="trending-timeframe">
+                                <option value="1h">1 Hour</option>
+                                <option value="6h">6 Hours</option>
+                                <option value="24h" selected>24 Hours</option>
+                                <option value="7d">7 Days</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="trending-category">Category:</label>
+                            <select id="trending-category">
+                                <option value="">All Categories</option>
+                                <option value="technology">Technology</option>
+                                <option value="business">Business</option>
+                                <option value="sports">Sports</option>
+                                <option value="entertainment">Entertainment</option>
+                                <option value="health">Health</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="trending-limit">Limit:</label>
+                            <select id="trending-limit">
+                                <option value="20">20</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="trending-cursor">Cursor (trending score):</label>
+                            <input type="text" id="trending-cursor" placeholder="Leave empty for first page">
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Articles Filter -->
@@ -447,21 +573,25 @@
         }
 
         function enableDemoButtons() {
-            const buttons = ['get-articles-btn', 'get-profile-btn', 'update-profile-btn', 
+            const buttons = ['get-articles-btn', 'get-feed-btn', 'get-trending-btn', 'get-profile-btn', 'update-profile-btn', 
                            'get-bookmarks-btn', 'get-embedding-btn', 'test-embedding-btn', 'logout-btn'];
             buttons.forEach(id => {
                 document.getElementById(id).disabled = false;
             });
             document.getElementById('articles-filters').classList.remove('hidden');
+            document.getElementById('feed-filters').classList.remove('hidden');
+            document.getElementById('trending-filters').classList.remove('hidden');
         }
 
         function disableDemoButtons() {
-            const buttons = ['get-articles-btn', 'get-profile-btn', 'update-profile-btn', 
+            const buttons = ['get-articles-btn', 'get-feed-btn', 'get-trending-btn', 'get-profile-btn', 'update-profile-btn', 
                            'get-bookmarks-btn', 'get-embedding-btn', 'test-embedding-btn', 'logout-btn'];
             buttons.forEach(id => {
                 document.getElementById(id).disabled = true;
             });
             document.getElementById('articles-filters').classList.add('hidden');
+            document.getElementById('feed-filters').classList.add('hidden');
+            document.getElementById('trending-filters').classList.add('hidden');
         }
 
         // API calls
@@ -570,6 +700,48 @@
             }
         }
 
+        // Google Authentication
+        function handleGoogleCredentialResponse(response) {
+            console.log('Google Sign-In response received:', response);
+            
+            if (response.credential) {
+                authenticateWithGoogle(response.credential);
+            } else {
+                showStatus('Google Sign-In failed: No credential received', 'error');
+            }
+        }
+
+        async function authenticateWithGoogle(idToken) {
+            try {
+                showStatus('Authenticating with Google...', 'info');
+                document.getElementById('google-auth-status').textContent = 'Authenticating...';
+                
+                const data = await makeRequest('/auth/google', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        id_token: idToken
+                    }),
+                });
+
+                currentToken = data.access_token;
+                currentUser = data;
+                
+                showStatus('Google authentication successful!', 'success');
+                document.getElementById('google-auth-status').textContent = 'Authentication successful!';
+                showResponse(data, 'Google Auth Response');
+                updateUserInfo(data);
+                enableDemoButtons();
+                
+                // Switch back to login tab to show user info
+                switchTab('login');
+                
+            } catch (error) {
+                showStatus(`Google authentication failed: ${error.message}`, 'error');
+                document.getElementById('google-auth-status').textContent = 'Authentication failed';
+                console.error('Google auth error:', error);
+            }
+        }
+
         function logout() {
             currentToken = null;
             currentUser = null;
@@ -613,6 +785,91 @@
             }
         }
 
+        async function getPersonalizedFeed() {
+            try {
+                showStatus('Fetching personalized feed...', 'info');
+                
+                const limit = document.getElementById('feed-limit').value;
+                const diversify = document.getElementById('feed-diversify').value;
+                const contentType = document.getElementById('feed-content-type').value;
+                const cursor = document.getElementById('feed-cursor').value;
+                
+                let queryParams = new URLSearchParams({
+                    limit,
+                    diversify,
+                    content_type: contentType,
+                    refresh: 'false'
+                });
+                
+                if (cursor) {
+                    queryParams.append('cursor', cursor);
+                }
+                
+                const data = await makeRequest(`/feed/personalized?${queryParams}`);
+                
+                showStatus('Personalized feed fetched successfully!', 'success');
+                showResponse(data, 'Personalized Feed Response');
+                displayFeedArticles(data.articles, 'Personalized Feed', data.next_cursor, data.has_more);
+                
+                // Show feed metadata
+                const container = document.getElementById('articles-container');
+                const metadataInfo = `
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
+                        <h4>🎯 Feed Metadata:</h4>
+                        <p><strong>Personalization Strength:</strong> ${(data.feed_metadata.personalization_strength * 100).toFixed(1)}%</p>
+                        <p><strong>Diversity Score:</strong> ${(data.feed_metadata.diversity_score * 100).toFixed(1)}%</p>
+                        <p><strong>Algorithm Version:</strong> ${data.feed_metadata.algorithm_version}</p>
+                        <p><strong>Generated At:</strong> ${new Date(data.feed_metadata.generated_at).toLocaleString()}</p>
+                        <p><strong>Cache TTL:</strong> ${data.feed_metadata.cache_ttl_minutes} minutes</p>
+                        <p><strong>Preload Next Batch:</strong> ${data.preload_next_batch ? 'Yes' : 'No'}</p>
+                        ${data.next_cursor ? `<p><strong>Next Cursor:</strong> <code>${data.next_cursor}</code></p>` : ''}
+                        <p><strong>Has More:</strong> ${data.has_more ? 'Yes' : 'No'}</p>
+                    </div>
+                `;
+                
+                if (container.innerHTML.includes('📰 Articles')) {
+                    container.innerHTML = container.innerHTML.replace('</div>', metadataInfo + '</div>');
+                } else {
+                    container.innerHTML = metadataInfo + container.innerHTML;
+                }
+                
+            } catch (error) {
+                showStatus(`Failed to fetch personalized feed: ${error.message}`, 'error');
+            }
+        }
+
+        async function getTrendingFeed() {
+            try {
+                showStatus('Fetching trending feed...', 'info');
+                
+                const timeframe = document.getElementById('trending-timeframe').value;
+                const category = document.getElementById('trending-category').value;
+                const limit = document.getElementById('trending-limit').value;
+                const cursor = document.getElementById('trending-cursor').value;
+                
+                let queryParams = new URLSearchParams({
+                    timeframe,
+                    limit
+                });
+                
+                if (category) {
+                    queryParams.append('category', category);
+                }
+                if (cursor) {
+                    queryParams.append('cursor', cursor);
+                }
+                
+                const data = await makeRequest(`/feed/trending?${queryParams}`);
+                
+                showStatus('Trending feed fetched successfully!', 'success');
+                showResponse(data, 'Trending Feed Response');
+                displayTrendingArticles(data.articles, data.trending_topics, data.next_cursor, data.has_more);
+                
+            } catch (error) {
+                showStatus(`Failed to fetch trending feed: ${error.message}`, 'error');
+            }
+        }
+
         function displayArticles(articles) {
             const container = document.getElementById('articles-container');
             
@@ -649,6 +906,151 @@
                         </div>
                     `).join('')}
                 </div>
+            `;
+        }
+
+        function displayFeedArticles(articles, feedType, nextCursor, hasMore) {
+            const container = document.getElementById('articles-container');
+            
+            if (!articles || articles.length === 0) {
+                container.innerHTML = '<p>No articles found in feed.</p>';
+                return;
+            }
+            
+            container.innerHTML = `
+                <h3>🎯 ${feedType} (${articles.length} articles):</h3>
+                <div class="articles-grid">
+                    ${articles.map(article => `
+                        <div class="article-card ${article.engagement?.user_bookmarked ? 'bookmarked' : ''}" onclick="getArticleDetails('${article.id}')">
+                            <div class="article-title">${article.title}</div>
+                            <div class="article-summary">${article.summary || 'No summary available'}</div>
+                            
+                            <!-- Feed-specific metadata -->
+                            <div style="background: #f0f8ff; padding: 10px; border-radius: 6px; margin: 10px 0; border-left: 3px solid #3498db;">
+                                <div style="font-size: 0.9em; color: #2c3e50;">
+                                    <div><strong>🎯 Recommendation:</strong> ${article.recommendation_reason || 'Recommended for you'}</div>
+                                    <div><strong>📊 Confidence:</strong> ${(article.confidence_score * 100).toFixed(1)}%</div>
+                                    <div><strong>⏱️ Read Time:</strong> ${article.estimated_read_time || 'Unknown'}</div>
+                                    ${article.engagement_prediction ? `
+                                        <div style="margin-top: 8px;">
+                                            <strong>🔮 Engagement Prediction:</strong>
+                                            <div style="font-size: 0.8em; color: #666;">
+                                                ❤️ Like: ${(article.engagement_prediction.likely_to_like * 100).toFixed(1)}% | 
+                                                📤 Share: ${(article.engagement_prediction.likely_to_share * 100).toFixed(1)}% | 
+                                                📖 Read: ${(article.engagement_prediction.likely_to_read_full * 100).toFixed(1)}%
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="article-meta">
+                                <span>📰 ${article.source?.name || 'Unknown'}</span>
+                                <span>👀 ${article.engagement?.views || 0} views</span>
+                                <span>❤️ ${article.engagement?.likes || 0} likes</span>
+                                <span>📤 ${article.engagement?.shares || 0} shares</span>
+                                <span>🔖 ${article.engagement?.user_bookmarked ? 'Bookmarked' : 'Not bookmarked'}</span>
+                            </div>
+                            <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button onclick="event.stopPropagation(); toggleLike('${article.id}', ${article.engagement?.user_liked || false})" class="${article.engagement?.user_liked ? 'success' : ''}" style="min-width: auto; padding: 8px 16px;">
+                                    ${article.engagement?.user_liked ? '❤️ Liked' : '🤍 Like'}
+                                </button>
+                                <button onclick="event.stopPropagation(); shareArticle('${article.id}')" class="${article.engagement?.user_shared ? 'warning' : ''}" style="min-width: auto; padding: 8px 16px;">
+                                    ${article.engagement?.user_shared ? '📤 Shared' : '📤 Share'}
+                                </button>
+                                <button onclick="event.stopPropagation(); toggleBookmark('${article.id}', ${article.engagement?.user_bookmarked || false})" class="${article.engagement?.user_bookmarked ? 'success' : ''}" style="min-width: auto; padding: 8px 16px;">
+                                    ${article.engagement?.user_bookmarked ? '🔖 Bookmarked' : '📑 Bookmark'}
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                ${hasMore ? `
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="getPersonalizedFeed()" class="button-group">Load More</button>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        function displayTrendingArticles(articles, trendingTopics, nextCursor, hasMore) {
+            const container = document.getElementById('articles-container');
+            
+            if (!articles || articles.length === 0) {
+                container.innerHTML = '<p>No trending articles found.</p>';
+                return;
+            }
+            
+            // Show trending topics first
+            let trendingTopicsHtml = '';
+            if (trendingTopics && trendingTopics.length > 0) {
+                trendingTopicsHtml = `
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                        <h4>🔥 Trending Topics:</h4>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px;">
+                            ${trendingTopics.map(topic => `
+                                <span style="background: #ffeaa7; padding: 5px 10px; border-radius: 15px; font-size: 0.9em;">
+                                    ${topic.topic} (${topic.mention_count} mentions)
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = `
+                <h3>🔥 Trending Feed (${articles.length} articles):</h3>
+                ${trendingTopicsHtml}
+                <div class="articles-grid">
+                    ${articles.map(article => `
+                        <div class="article-card ${article.engagement?.user_bookmarked ? 'bookmarked' : ''}" onclick="getArticleDetails('${article.id}')">
+                            <div class="article-title">${article.title}</div>
+                            <div class="article-summary">${article.summary || 'No summary available'}</div>
+                            
+                            <!-- Trending-specific metadata -->
+                            <div style="background: #fff5f5; padding: 10px; border-radius: 6px; margin: 10px 0; border-left: 3px solid #e74c3c;">
+                                <div style="font-size: 0.9em; color: #2c3e50;">
+                                    <div><strong>🔥 Trend Score:</strong> ${article.trend_score ? article.trend_score.toFixed(2) : 'N/A'}</div>
+                                    <div><strong>📈 Rank:</strong> #${article.trending_rank || 'N/A'}</div>
+                                    <div><strong>⚡ Velocity:</strong> ${article.velocity || 'N/A'}</div>
+                                    ${article.engagement_metrics ? `
+                                        <div style="margin-top: 8px;">
+                                            <strong>📊 Engagement:</strong>
+                                            <div style="font-size: 0.8em; color: #666;">
+                                                👀 Views/hr: ${article.engagement_metrics.views_last_hour || 0} | 
+                                                📤 Shares/min: ${article.engagement_metrics.shares_per_minute ? article.engagement_metrics.shares_per_minute.toFixed(1) : 0}
+                                            </div>
+                                        </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                            
+                            <div class="article-meta">
+                                <span>📰 ${article.source?.name || 'Unknown'}</span>
+                                <span>👀 ${article.engagement?.views || 0} views</span>
+                                <span>❤️ ${article.engagement?.likes || 0} likes</span>
+                                <span>📤 ${article.engagement?.shares || 0} shares</span>
+                                <span>🔖 ${article.engagement?.user_bookmarked ? 'Bookmarked' : 'Not bookmarked'}</span>
+                            </div>
+                            <div style="margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap;">
+                                <button onclick="event.stopPropagation(); toggleLike('${article.id}', ${article.engagement?.user_liked || false})" class="${article.engagement?.user_liked ? 'success' : ''}" style="min-width: auto; padding: 8px 16px;">
+                                    ${article.engagement?.user_liked ? '❤️ Liked' : '🤍 Like'}
+                                </button>
+                                <button onclick="event.stopPropagation(); shareArticle('${article.id}')" class="${article.engagement?.user_shared ? 'warning' : ''}" style="min-width: auto; padding: 8px 16px;">
+                                    ${article.engagement?.user_shared ? '📤 Shared' : '📤 Share'}
+                                </button>
+                                <button onclick="event.stopPropagation(); toggleBookmark('${article.id}', ${article.engagement?.user_bookmarked || false})" class="${article.engagement?.user_bookmarked ? 'success' : ''}" style="min-width: auto; padding: 8px 16px;">
+                                    ${article.engagement?.user_bookmarked ? '🔖 Bookmarked' : '📑 Bookmark'}
+                                </button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                ${hasMore ? `
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button onclick="getTrendingFeed()" class="button-group">Load More</button>
+                    </div>
+                ` : ''}
             `;
         }
 

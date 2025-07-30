@@ -99,6 +99,62 @@ This documentation covers the complete API specification for a swipe-based news 
 }
 ```
 
+#### `POST /auth/google`
+**Purpose**: Authenticate user with Google OAuth
+**Authentication**: None required
+
+**Request Body**:
+```json
+{
+  "id_token": "google_id_token_from_client"
+}
+```
+
+**Response** (200):
+```json
+{
+  "user_id": "uuid",
+  "access_token": "jwt_token",
+  "refresh_token": "refresh_token",
+  "expires_in": 3600,
+  "user_profile": {
+    "username": "google_user_123",
+    "display_name": "John Doe",
+    "profile_image": "https://lh3.googleusercontent.com/..."
+  }
+}
+```
+
+**Business Logic**: Verifies Google ID token, creates new user if doesn't exist, returns JWT tokens.
+
+#### `POST /auth/apple`
+**Purpose**: Authenticate user with Apple OAuth
+**Authentication**: None required
+
+**Request Body**:
+```json
+{
+  "id_token": "apple_id_token_from_client"
+}
+```
+
+**Response** (200):
+```json
+{
+  "user_id": "uuid",
+  "access_token": "jwt_token",
+  "refresh_token": "refresh_token",
+  "expires_in": 3600,
+  "user_profile": {
+    "username": "apple_user_123",
+    "display_name": "John Doe",
+    "profile_image": null
+  }
+}
+```
+
+**Business Logic**: Verifies Apple ID token, creates new user if doesn't exist, returns JWT tokens.
+
 ### User Profile Management
 
 #### `GET /users/profile`

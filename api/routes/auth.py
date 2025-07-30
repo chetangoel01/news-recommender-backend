@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from datetime import timedelta
@@ -10,7 +10,10 @@ from core.auth import (
     create_refresh_token,
     verify_token,
     get_user_by_username,
-    ACCESS_TOKEN_EXPIRE_MINUTES
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    verify_google_id_token,
+    verify_apple_id_token,
+    get_user_by_email
 )
 from core.schemas import (
     UserRegister,
@@ -22,8 +25,12 @@ from core.schemas import (
     UserProfile,
     ErrorResponse
 )
+import os
 
 router = APIRouter(tags=["authentication"])
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "your-google-client-id")
+APPLE_CLIENT_ID = os.getenv("APPLE_CLIENT_ID", "your-apple-client-id")
 
 @router.post("/register", response_model=UserRegisterResponse, status_code=status.HTTP_201_CREATED)
 async def register_user(user_data: UserRegister, db: Session = Depends(get_db)):
@@ -147,4 +154,92 @@ async def refresh_token(token_data: TokenRefresh, db: Session = Depends(get_db))
     return TokenRefreshResponse(
         access_token=access_token,
         expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60  # Convert to seconds
+    ) 
+
+@router.post("/google", response_model=UserLoginResponse)
+async def google_auth(request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    id_token = data.get("id_token")
+    if not id_token:
+        raise HTTPException(status_code=400, detail="Missing id_token")
+    payload = verify_google_id_token(id_token, GOOGLE_CLIENT_ID)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    email = payload.get("email")
+    display_name = payload.get("name")
+    profile_image = payload.get("picture")
+    # Try to find user by email
+    user = get_user_by_email(db, email)
+    if not user:
+        # Create a new user with a random username
+        import uuid
+        username = f"google_{uuid.uuid4().hex[:8]}"
+        user_dict = {
+            "email": email,
+            "username": username,
+            "display_name": display_name or username,
+            "password": uuid.uuid4().hex,  # random password, not used
+            "preferences": {"categories": ["technology"], "language": "en", "content_type": "mixed"}
+        }
+        user = create_user(db, user_dict)
+        # Optionally set profile_image
+        if profile_image:
+            user.profile_image = profile_image
+            db.commit()
+    access_token = create_access_token(
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    refresh_token = create_refresh_token(data={"sub": user.username})
+    return UserLoginResponse(
+        user_id=user.id,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_profile=UserProfile(
+            username=user.username,
+            display_name=user.display_name,
+            profile_image=user.profile_image
+        )
+    )
+
+@router.post("/apple", response_model=UserLoginResponse)
+async def apple_auth(request: Request, db: Session = Depends(get_db)):
+    data = await request.json()
+    id_token = data.get("id_token")
+    if not id_token:
+        raise HTTPException(status_code=400, detail="Missing id_token")
+    payload = verify_apple_id_token(id_token, APPLE_CLIENT_ID)
+    if not payload:
+        raise HTTPException(status_code=401, detail="Invalid Apple token")
+    email = payload.get("email")
+    display_name = payload.get("name") or email.split("@")[0]
+    # Try to find user by email
+    user = get_user_by_email(db, email)
+    if not user:
+        import uuid
+        username = f"apple_{uuid.uuid4().hex[:8]}"
+        user_dict = {
+            "email": email,
+            "username": username,
+            "display_name": display_name or username,
+            "password": uuid.uuid4().hex,  # random password, not used
+            "preferences": {"categories": ["technology"], "language": "en", "content_type": "mixed"}
+        }
+        user = create_user(db, user_dict)
+    access_token = create_access_token(
+        data={"sub": user.username},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+    refresh_token = create_refresh_token(data={"sub": user.username})
+    return UserLoginResponse(
+        user_id=user.id,
+        access_token=access_token,
+        refresh_token=refresh_token,
+        expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        user_profile=UserProfile(
+            username=user.username,
+            display_name=user.display_name,
+            profile_image=user.profile_image
+        )
     ) 

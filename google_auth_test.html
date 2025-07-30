@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Authentication Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        .warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        button {
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background-color: #357abd; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Google Authentication Test</h1>
+        
+        <div class="status info">
+            <strong>Status:</strong> This page tests the Google authentication endpoint at <code>/auth/google</code>
+        </div>
+
+        <div class="test-section">
+            <h2>1. Test Missing Token</h2>
+            <p>Test the endpoint with no token provided (should return 400)</p>
+            <button onclick="testMissingToken()">Test Missing Token</button>
+            <div id="missing-token-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Test Invalid Token</h2>
+            <p>Test the endpoint with an invalid token (should return 401)</p>
+            <button onclick="testInvalidToken()">Test Invalid Token</button>
+            <div id="invalid-token-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Test with Custom Token</h2>
+            <p>Test with a custom token value</p>
+            <input type="text" id="custom-token" placeholder="Enter a token to test" style="width: 300px; padding: 8px; margin: 10px 0;">
+            <br>
+            <button onclick="testCustomToken()">Test Custom Token</button>
+            <div id="custom-token-result"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>4. Configuration Status</h2>
+            <div id="config-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>5. How to Set Up Google Authentication</h2>
+            <div class="status warning">
+                <strong>Setup Required:</strong> To use real Google authentication, you need to:
+            </div>
+            <ol>
+                <li>Create a Google OAuth 2.0 client in the <a href="https://console.developers.google.com/" target="_blank">Google Cloud Console</a></li>
+                <li>Set the <code>GOOGLE_CLIENT_ID</code> environment variable</li>
+                <li>Configure authorized origins and redirect URIs</li>
+                <li>Use the Google Sign-In JavaScript library in your frontend</li>
+            </ol>
+            
+            <h3>Example Frontend Integration:</h3>
+            <pre><code>&lt;script src="https://accounts.google.com/gsi/client"&gt;&lt;/script&gt;
+&lt;div id="g_id_onload"
+     data-client_id="YOUR_GOOGLE_CLIENT_ID"
+     data-callback="handleCredentialResponse"&gt;
+&lt;/div&gt;
+&lt;div class="g_id_signin" data-type="standard"&gt;&lt;/div&gt;
+
+&lt;script&gt;
+function handleCredentialResponse(response) {
+    // Send the ID token to your backend
+    fetch('/auth/google', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            id_token: response.credential
+        })
+    })
+    .then(res =&gt; res.json())
+    .then(data =&gt; {
+        // Handle successful authentication
+        console.log('Authenticated:', data);
+    })
+    .catch(error =&gt; {
+        console.error('Auth error:', error);
+    });
+}
+&lt;/script&gt;</code></pre>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        async function makeRequest(endpoint, data = null) {
+            try {
+                const options = {
+                    method: data ? 'POST' : 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                return {
+                    status: response.status,
+                    data: result,
+                    success: response.ok
+                };
+            } catch (error) {
+                return {
+                    status: 0,
+                    data: { error: error.message },
+                    success: false
+            }
+        }
+    }
+
+        function showResult(elementId, result, title) {
+            const element = document.getElementById(elementId);
+            const statusClass = result.success ? 'success' : 'error';
+            
+            element.innerHTML = `
+                <div class="status ${statusClass}">
+                    <strong>${title}</strong><br>
+                    Status: ${result.status}<br>
+                    Response: <pre>${JSON.stringify(result.data, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        async function testMissingToken() {
+            const result = await makeRequest('/auth/google', {});
+            showResult('missing-token-result', result, 'Missing Token Test');
+        }
+
+        async function testInvalidToken() {
+            const result = await makeRequest('/auth/google', { id_token: 'invalid_token' });
+            showResult('invalid-token-result', result, 'Invalid Token Test');
+        }
+
+        async function testCustomToken() {
+            const token = document.getElementById('custom-token').value;
+            if (!token) {
+                alert('Please enter a token to test');
+                return;
+            }
+            const result = await makeRequest('/auth/google', { id_token: token });
+            showResult('custom-token-result', result, 'Custom Token Test');
+        }
+
+        async function checkConfigStatus() {
+            const element = document.getElementById('config-status');
+            
+            try {
+                // Test if server is running
+                const result = await makeRequest('/auth/google', { id_token: 'test' });
+                
+                if (result.status === 401 && result.data.detail === 'Invalid Google token') {
+                    element.innerHTML = `
+                        <div class="status success">
+                            <strong>✅ Server Status:</strong> Running and responding correctly<br>
+                            <strong>✅ Endpoint:</strong> /auth/google is accessible<br>
+                            <strong>⚠️ Configuration:</strong> GOOGLE_CLIENT_ID needs to be set for real authentication
+                        </div>
+                    `;
+                } else {
+                    element.innerHTML = `
+                        <div class="status error">
+                            <strong>❌ Server Status:</strong> Unexpected response<br>
+                            Status: ${result.status}<br>
+                            Response: ${JSON.stringify(result.data)}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                element.innerHTML = `
+                    <div class="status error">
+                        <strong>❌ Server Status:</strong> Cannot connect to server<br>
+                        Make sure the server is running on localhost:8000<br>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        // Check status when page loads
+        window.onload = function() {
+            checkConfigStatus();
+        };
+    </script>
+</body>
+</html> 

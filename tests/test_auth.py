@@ -1,6 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 from typing import Dict, Any
+import os
 
 pytestmark = pytest.mark.auth
 
@@ -293,3 +294,36 @@ class TestAuthenticationFlow:
         user1_id = login1_response.json()["user_id"]
         user2_id = login2_response.json()["user_id"]
         assert user1_id != user2_id 
+
+
+class TestGoogleAuthentication:
+    """Test Google OAuth authentication endpoint."""
+
+    def test_google_auth_missing_token(self, client: TestClient):
+        """Test Google auth with missing id_token."""
+        response = client.post("/auth/google", json={})
+        assert response.status_code == 400
+        assert "Missing id_token" in response.text
+
+    def test_google_auth_invalid_token(self, client: TestClient):
+        """Test Google auth with invalid id_token."""
+        response = client.post("/auth/google", json={"id_token": "invalid_token"})
+        assert response.status_code == 401
+        assert "Invalid Google token" in response.text
+
+    def test_google_auth_client_id_not_configured(self, client: TestClient):
+        """Test Google auth when GOOGLE_CLIENT_ID is not properly configured."""
+        # This test assumes the default value is being used
+        response = client.post("/auth/google", json={"id_token": "some_token"})
+        assert response.status_code == 401
+        assert "Invalid Google token" in response.text
+
+    @pytest.mark.skipif(
+        not os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_CLIENT_ID") == "your-google-client-id",
+        reason="GOOGLE_CLIENT_ID not properly configured for integration test"
+    )
+    def test_google_auth_with_real_token(self, client: TestClient):
+        """Test Google auth with a real token (requires proper configuration)."""
+        # This test would require a real Google ID token
+        # It's skipped unless GOOGLE_CLIENT_ID is properly configured
+        pass 

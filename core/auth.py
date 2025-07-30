@@ -9,6 +9,9 @@ from core.db import get_db
 from core.models import User
 from core.schemas import TokenData
 import os
+import requests
+from jose import jwt, JWTError
+from jose.utils import base64url_decode
 
 # Configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-here-change-in-production")
@@ -72,6 +75,58 @@ def verify_token(token: str, token_type: str = "access") -> Optional[TokenData]:
         token_data = TokenData(username=username)
         return token_data
     except JWTError:
+        return None
+
+def verify_google_id_token(id_token: str, audience: str) -> Optional[dict]:
+    """Verify Google ID token and return payload if valid."""
+    try:
+        # Get Google's public keys
+        resp = requests.get("https://www.googleapis.com/oauth2/v3/certs")
+        jwks = resp.json()
+        unverified_header = jwt.get_unverified_header(id_token)
+        key = None
+        for k in jwks["keys"]:
+            if k["kid"] == unverified_header["kid"]:
+                key = k
+                break
+        if not key:
+            return None
+        # Build public key
+        public_key = jwt.construct_rsa_public_key(key)
+        payload = jwt.decode(
+            id_token,
+            public_key,
+            algorithms=["RS256"],
+            audience=audience
+        )
+        return payload
+    except Exception:
+        return None
+
+def verify_apple_id_token(id_token: str, audience: str) -> Optional[dict]:
+    """Verify Apple ID token and return payload if valid."""
+    try:
+        # Get Apple's public keys
+        resp = requests.get("https://appleid.apple.com/auth/keys")
+        jwks = resp.json()
+        unverified_header = jwt.get_unverified_header(id_token)
+        key = None
+        for k in jwks["keys"]:
+            if k["kid"] == unverified_header["kid"]:
+                key = k
+                break
+        if not key:
+            return None
+        # Build public key
+        public_key = jwt.construct_rsa_public_key(key)
+        payload = jwt.decode(
+            id_token,
+            public_key,
+            algorithms=["RS256"],
+            audience=audience
+        )
+        return payload
+    except Exception:
         return None
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:

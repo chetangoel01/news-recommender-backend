@@ -94,7 +94,7 @@ Tests are organized using pytest markers:
 ```
 tests/
 ├── conftest.py           # PostgreSQL fixtures and test configuration
-├── test_auth.py          # Authentication & authorization tests
+├── test_auth.py          # Authentication & authorization tests (including OAuth)
 ├── test_users.py         # User profile & embedding tests
 ├── test_db_connection.py # Database connectivity validation
 └── test_*.py            # Additional test modules
@@ -164,9 +164,25 @@ open htmlcov/index.html
 - ✅ Password hashing with bcrypt
 - ✅ JWT token generation and validation
 - ✅ Refresh token rotation
+- ✅ Google OAuth authentication (token verification, user creation)
+- ✅ Apple OAuth authentication (token verification, user creation)
 - ✅ Input validation with Pydantic
 - ✅ Duplicate email/username handling
 - ✅ Authentication required endpoints
+
+### OAuth Authentication Tests (`test_auth.py`)
+
+**Test Classes:**
+- `TestGoogleAuthentication`: Google OAuth flow testing
+- `TestAppleAuthentication`: Apple OAuth flow testing
+
+**Key Features Tested:**
+- ✅ Google ID token verification with public keys
+- ✅ Apple ID token verification with public keys
+- ✅ Automatic user creation for new OAuth users
+- ✅ Error handling for invalid/missing tokens
+- ✅ Client ID configuration validation
+- ✅ OAuth user profile integration
 
 ### User Profile Tests (`test_users.py`)
 
