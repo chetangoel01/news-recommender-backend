@@ -4,7 +4,7 @@ from sqlalchemy import desc
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
 from core.db import get_db
-from core.auth import get_current_active_user
+from core.auth import get_current_active_user, verify_password, get_password_hash
 from core.models import User, UserEmbeddingUpdate, Bookmark, Article, Like, Share
 from core.schemas import (
     UserProfileResponse,
@@ -12,26 +12,25 @@ from core.schemas import (
     UserEmbeddingUpdateRequest,
     UserEmbeddingUpdateResponse,
     EmbeddingStatusResponse,
+    PasswordChange,
     BookmarksResponse,
-    BookmarkItem,
     ArticleSummary,
-    ArticleSource,
-    ArticleEngagement
+    BookmarkItem
 )
 
 router = APIRouter(tags=["users"])
 
-def _build_article_source(article: Article) -> ArticleSource:
-    """Helper function to build ArticleSource from Article model."""
-    return ArticleSource(
-        id=article.source_id,
-        name=article.source_name,
-        logo=None,  # TODO: Add source logo mapping
-        credibility_score=None  # TODO: Implement credibility scoring
-    )
+def _build_article_source(article: Article) -> Dict[str, Any]:
+    """Helper function to build article source dict from Article model."""
+    return {
+        "id": article.source_id,
+        "name": article.source_name,
+        "logo": None,  # TODO: Add source logo mapping
+        "credibility_score": None  # TODO: Implement credibility scoring
+    }
 
-def _build_article_engagement(article: Article, user: User, db: Session) -> ArticleEngagement:
-    """Helper function to build ArticleEngagement from Article model."""
+def _build_article_engagement(article: Article, user: User, db: Session) -> Dict[str, Any]:
+    """Helper function to build article engagement dict from Article model."""
     from sqlalchemy import and_
     # Check if user has liked/shared/bookmarked this article
     user_liked = bool(
@@ -52,14 +51,14 @@ def _build_article_engagement(article: Article, user: User, db: Session) -> Arti
         ).first()
     ) if user else False
     
-    return ArticleEngagement(
-        views=article.views or 0,
-        likes=article.likes or 0,
-        shares=article.shares or 0,
-        user_liked=user_liked,
-        user_shared=user_shared,
-        user_bookmarked=user_bookmarked
-    )
+    return {
+        "views": article.views or 0,
+        "likes": article.likes or 0,
+        "shares": article.shares or 0,
+        "user_liked": user_liked,
+        "user_shared": user_shared,
+        "user_bookmarked": user_bookmarked
+    }
 
 def _get_content_preview(content: str, max_length: int = 200) -> str:
     """Generate content preview with specified max length."""
@@ -114,6 +113,21 @@ async def update_user_profile(
     if profile_update.display_name is not None:
         current_user.display_name = profile_update.display_name
     
+    if profile_update.email is not None:
+        # Check if email is already taken by another user
+        existing_user = db.query(User).filter(
+            User.email == profile_update.email,
+            User.id != current_user.id
+        ).first()
+        
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered by another user"
+            )
+        
+        current_user.email = profile_update.email
+    
     if profile_update.bio is not None:
         current_user.bio = profile_update.bio
     
@@ -149,6 +163,41 @@ async def update_user_profile(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update profile"
+        )
+
+@router.put("/password", response_model=dict)
+async def change_password(
+    password_data: PasswordChange,
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Change user password.
+    
+    Requires current password verification and new password validation.
+    """
+    # Verify current password
+    if not verify_password(password_data.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+    
+    # Hash new password
+    new_hashed_password = get_password_hash(password_data.new_password)
+    
+    # Update password
+    current_user.password_hash = new_hashed_password
+    current_user.last_active = datetime.now(timezone.utc)
+    
+    try:
+        db.commit()
+        return {"message": "Password changed successfully"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to change password"
         )
 
 @router.post("/embedding/update", response_model=UserEmbeddingUpdateResponse)

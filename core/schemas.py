@@ -36,6 +36,16 @@ class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+    @field_validator('new_password')
+    def validate_new_password(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        return v
+
 class TokenRefresh(BaseModel):
     refresh_token: str
 
@@ -86,6 +96,7 @@ class UserProfileResponse(BaseModel):
 
 class UserProfileUpdate(BaseModel):
     display_name: Optional[str] = None
+    email: Optional[str] = None
     bio: Optional[str] = None
     profile_image: Optional[str] = None
     preferences: Optional[Dict[str, Any]] = None
