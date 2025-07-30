@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, func, and_, or_, text
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import uuid
 
 from core.db import get_db
@@ -14,8 +14,6 @@ from core.schemas import (
     ArticleSummary,
     ArticleSource,
     ArticleEngagement,
-    ArticleViewRequest,
-    ArticleViewResponse,
     BookmarkResponse,
     BookmarksResponse,
     BookmarkItem,
@@ -241,64 +239,8 @@ async def get_article(
             detail="Failed to retrieve article"
         )
 
-@router.post("/{article_id}/view", response_model=ArticleViewResponse)
-async def track_article_view(
-    article_id: str,
-    view_data: ArticleViewRequest,
-    current_user: User = Depends(get_current_active_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Track that user viewed an article (for swipe-based tracking).
-    
-    Records user engagement data and triggers real-time recommendation updates
-    if significant interaction is detected.
-    """
-    try:
-        # Parse article ID
-        try:
-            article_uuid = uuid.UUID(article_id)
-        except ValueError:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid article ID format"
-            )
-        
-        # Verify article exists
-        article = db.query(Article).filter(Article.id == article_uuid).first()
-        if not article:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Article not found"
-            )
-        
-        # TODO: Store interaction data for ML model training
-        # This would typically go into a user_interactions table
-        
-        # TODO: Update ML model with user engagement data
-        # Check if this interaction should trigger recommendation updates
-        updated_recommendations = False
-        if view_data.view_duration_seconds > 30 or view_data.percentage_read and view_data.percentage_read > 70:
-            # Significant engagement - trigger recommendation update
-            updated_recommendations = True
-            # TODO: Implement real-time recommendation update logic
-        
-        # Update user's articles_read count
-        current_user.articles_read = (current_user.articles_read or 0) + 1
-        db.commit()
-        
-        return ArticleViewResponse(
-            tracked=True,
-            updated_recommendations=updated_recommendations
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to track article view"
-        )
+# View tracking is now handled locally on the device
+# No server-side view tracking endpoint needed
 
 @router.post("/{article_id}/like", response_model=LikeResponse)
 async def like_article(

@@ -1,6 +1,8 @@
 import pytest
 from fastapi.testclient import TestClient
 from typing import Dict, Any
+from sqlalchemy.orm import Session
+from core.models import UserEmbeddingUpdate
 
 pytestmark = pytest.mark.users
 
@@ -158,12 +160,12 @@ class TestUserProfile:
 class TestUserEmbeddingUpdate:
     """Test user embedding update endpoints."""
 
-    @pytest.mark.xfail(reason="Known backend bug", strict=True)
     def test_embedding_update_success(
         self, 
         client: TestClient, 
         auth_headers: Dict[str, str],
-        test_embedding_update_data: Dict[str, Any]
+        test_embedding_update_data: Dict[str, Any],
+        db_session: Session
     ):
         """Test successful embedding update."""
         response = client.post(
@@ -190,6 +192,26 @@ class TestUserEmbeddingUpdate:
         assert isinstance(data["diversity_adjustment"], float)
         assert 0 <= data["personalization_score"] <= 1
         assert 0 <= data["diversity_adjustment"] <= 1
+        
+        # Track the created UserEmbeddingUpdate record for cleanup
+        # Find the latest embedding update for this user
+        user_id = data.get("user_id")  # If response includes user_id
+        if not user_id:
+            # Get user_id from auth token or profile
+            profile_response = client.get("/users/profile", headers=auth_headers)
+            if profile_response.status_code == 200:
+                user_id = profile_response.json()["user_id"]
+        
+        if user_id and hasattr(db_session, '_test_data_tracker'):
+            # Find the latest embedding update for this user
+            latest_update = db_session.query(UserEmbeddingUpdate)\
+                .filter(UserEmbeddingUpdate.user_id == user_id)\
+                .order_by(UserEmbeddingUpdate.created_at.desc())\
+                .first()
+            
+            if latest_update:
+                db_session._test_data_tracker['user_embedding_updates'].add(str(latest_update.id))
+                print(f"🔒 REGISTERED for cleanup: user_embedding_updates ID {latest_update.id}")
 
     def test_embedding_update_invalid_vector_size(
         self, 
@@ -247,12 +269,12 @@ class TestUserEmbeddingUpdate:
         )
         assert response.status_code == 401
 
-    @pytest.mark.xfail(reason="Known backend bug", strict=True)
     def test_embedding_update_updates_user_stats(
         self, 
         client: TestClient, 
         auth_headers: Dict[str, str],
-        test_embedding_update_data: Dict[str, Any]
+        test_embedding_update_data: Dict[str, Any],
+        db_session: Session
     ):
         """Test that embedding update properly updates user statistics."""
         # Get initial profile
@@ -268,6 +290,18 @@ class TestUserEmbeddingUpdate:
             headers=auth_headers
         )
         assert response.status_code == 200
+        
+        # Track the created UserEmbeddingUpdate record for cleanup
+        user_id = initial_profile["user_id"]
+        if hasattr(db_session, '_test_data_tracker'):
+            latest_update = db_session.query(UserEmbeddingUpdate)\
+                .filter(UserEmbeddingUpdate.user_id == user_id)\
+                .order_by(UserEmbeddingUpdate.created_at.desc())\
+                .first()
+            
+            if latest_update:
+                db_session._test_data_tracker['user_embedding_updates'].add(str(latest_update.id))
+                print(f"🔒 REGISTERED for cleanup: user_embedding_updates ID {latest_update.id}")
         
         # Check updated profile
         updated_profile_response = client.get("/users/profile", headers=auth_headers)
@@ -307,12 +341,12 @@ class TestEmbeddingStatus:
         assert "update_frequency" in config
         assert "batch_size_recommended" in config
 
-    @pytest.mark.xfail(reason="Known backend bug", strict=True)
     def test_embedding_status_after_update(
         self, 
         client: TestClient, 
         auth_headers: Dict[str, str],
-        test_embedding_update_data: Dict[str, Any]
+        test_embedding_update_data: Dict[str, Any],
+        db_session: Session
     ):
         """Test embedding status after performing an update."""
         # First, update embedding
@@ -322,6 +356,22 @@ class TestEmbeddingStatus:
             headers=auth_headers
         )
         assert update_response.status_code == 200
+        
+        # Track the created UserEmbeddingUpdate record for cleanup
+        user_id = None
+        profile_response = client.get("/users/profile", headers=auth_headers)
+        if profile_response.status_code == 200:
+            user_id = profile_response.json()["user_id"]
+        
+        if user_id and hasattr(db_session, '_test_data_tracker'):
+            latest_update = db_session.query(UserEmbeddingUpdate)\
+                .filter(UserEmbeddingUpdate.user_id == user_id)\
+                .order_by(UserEmbeddingUpdate.created_at.desc())\
+                .first()
+            
+            if latest_update:
+                db_session._test_data_tracker['user_embedding_updates'].add(str(latest_update.id))
+                print(f"🔒 REGISTERED for cleanup: user_embedding_updates ID {latest_update.id}")
         
         # Then check status
         status_response = client.get("/users/embedding/status", headers=auth_headers)
@@ -345,12 +395,12 @@ class TestEmbeddingStatus:
 class TestUserProfileIntegration:
     """Test integration scenarios for user profile management."""
 
-    @pytest.mark.xfail(reason="Known backend bug", strict=True)
     def test_complete_user_lifecycle(
         self, 
         client: TestClient, 
         test_user_data: Dict[str, Any],
-        test_embedding_update_data: Dict[str, Any]
+        test_embedding_update_data: Dict[str, Any],
+        db_session: Session
     ):
         """Test complete user lifecycle: register -> profile -> update -> embedding."""
         # 1. Register user
@@ -384,6 +434,18 @@ class TestUserProfileIntegration:
         )
         assert embedding_response.status_code == 200
         
+        # Track the created UserEmbeddingUpdate record for cleanup
+        user_id = initial_profile["user_id"]
+        if hasattr(db_session, '_test_data_tracker'):
+            latest_update = db_session.query(UserEmbeddingUpdate)\
+                .filter(UserEmbeddingUpdate.user_id == user_id)\
+                .order_by(UserEmbeddingUpdate.created_at.desc())\
+                .first()
+            
+            if latest_update:
+                db_session._test_data_tracker['user_embedding_updates'].add(str(latest_update.id))
+                print(f"🔒 REGISTERED for cleanup: user_embedding_updates ID {latest_update.id}")
+        
         # 5. Check final profile state
         final_profile_response = client.get("/users/profile", headers=auth_headers)
         assert final_profile_response.status_code == 200
@@ -395,12 +457,12 @@ class TestUserProfileIntegration:
         assert "technology" in final_profile["preferences"]["categories"]
         assert final_profile["articles_read"] == test_embedding_update_data["articles_processed"]
 
-    @pytest.mark.xfail(reason="Known backend bug", strict=True)
     def test_multiple_embedding_updates(
         self, 
         client: TestClient, 
         auth_headers: Dict[str, str],
-        test_embedding_update_data: Dict[str, Any]
+        test_embedding_update_data: Dict[str, Any],
+        db_session: Session
     ):
         """Test multiple embedding updates accumulate correctly."""
         # First update
@@ -410,6 +472,22 @@ class TestUserProfileIntegration:
             headers=auth_headers
         )
         assert response1.status_code == 200
+        
+        # Track first update
+        user_id = None
+        profile_response = client.get("/users/profile", headers=auth_headers)
+        if profile_response.status_code == 200:
+            user_id = profile_response.json()["user_id"]
+        
+        if user_id and hasattr(db_session, '_test_data_tracker'):
+            latest_update = db_session.query(UserEmbeddingUpdate)\
+                .filter(UserEmbeddingUpdate.user_id == user_id)\
+                .order_by(UserEmbeddingUpdate.created_at.desc())\
+                .first()
+            
+            if latest_update:
+                db_session._test_data_tracker['user_embedding_updates'].add(str(latest_update.id))
+                print(f"🔒 REGISTERED for cleanup: user_embedding_updates ID {latest_update.id}")
         
         # Second update with different data
         second_update = test_embedding_update_data.copy()
@@ -422,6 +500,17 @@ class TestUserProfileIntegration:
             headers=auth_headers
         )
         assert response2.status_code == 200
+        
+        # Track second update
+        if user_id and hasattr(db_session, '_test_data_tracker'):
+            latest_update = db_session.query(UserEmbeddingUpdate)\
+                .filter(UserEmbeddingUpdate.user_id == user_id)\
+                .order_by(UserEmbeddingUpdate.created_at.desc())\
+                .first()
+            
+            if latest_update:
+                db_session._test_data_tracker['user_embedding_updates'].add(str(latest_update.id))
+                print(f"🔒 REGISTERED for cleanup: user_embedding_updates ID {latest_update.id}")
         
         # Check final profile
         profile_response = client.get("/users/profile", headers=auth_headers)

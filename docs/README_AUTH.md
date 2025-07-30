@@ -20,6 +20,7 @@ DATABASE_URL=postgresql://user:password@host:port/dbname
 
 # Authentication Configuration
 SECRET_KEY=your-super-secret-key-change-in-production
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
 DEBUG=true
 ```
 
@@ -81,6 +82,41 @@ Content-Type: application/json
 
 {
   "refresh_token": "your_refresh_token_here"
+}
+```
+
+#### Google Authentication
+```http
+POST /auth/google
+Content-Type: application/json
+
+{
+  "id_token": "google_id_token_from_client"
+}
+```
+
+**Response:**
+```json
+{
+  "user_id": "uuid",
+  "access_token": "jwt_access_token",
+  "refresh_token": "jwt_refresh_token",
+  "expires_in": 3600,
+  "user_profile": {
+    "username": "google_user_123",
+    "display_name": "John Doe",
+    "profile_image": "https://lh3.googleusercontent.com/..."
+  }
+}
+```
+
+#### Apple Authentication
+```http
+POST /auth/apple
+Content-Type: application/json
+
+{
+  "id_token": "apple_id_token_from_client"
 }
 ```
 
@@ -148,25 +184,40 @@ Authorization: Bearer your_access_token_here
 
 ## 🔒 Authentication Flow
 
-### 1. User Registration
+### 1. Email/Password Registration
 - User provides email, password, username, and preferences
 - Password is hashed using bcrypt
 - User record is created in database
 - Access token (1 hour) and refresh token (30 days) are returned
 
-### 2. User Login
+### 2. Email/Password Login
 - User provides email and password
 - Credentials are verified against database
 - New access and refresh tokens are generated
 - User profile information is returned
 
-### 3. Token Usage
+### 3. Google Authentication
+- Client obtains Google ID token from Google Sign-In SDK
+- ID token is sent to `/auth/google` endpoint
+- Backend verifies token with Google's public keys
+- If user doesn't exist, new user is created automatically
+- Access and refresh tokens are returned
+- User profile includes Google account information
+
+### 4. Apple Authentication
+- Client obtains Apple ID token from Apple Sign-In SDK
+- ID token is sent to `/auth/apple` endpoint
+- Backend verifies token with Apple's public keys
+- If user doesn't exist, new user is created automatically
+- Access and refresh tokens are returned
+
+### 5. Token Usage
 - Include access token in Authorization header: `Bearer <token>`
 - Access tokens expire after 1 hour
 - Use refresh token to get new access token when needed
 - Refresh tokens expire after 30 days
 
-### 4. Protected Endpoints
+### 6. Protected Endpoints
 - All user profile endpoints require valid access token
 - Invalid or expired tokens return 401 Unauthorized
 - Inactive users are rejected with 400 Bad Request
@@ -210,6 +261,75 @@ CREATE TABLE user_embedding_updates (
     app_version VARCHAR(20),
     created_at TIMESTAMP DEFAULT NOW()
 );
+```
+
+## 🔐 OAuth Setup
+
+### Google OAuth Configuration
+
+1. **Create Google OAuth Client:**
+   - Go to [Google Cloud Console](https://console.developers.google.com/)
+   - Navigate to APIs & Services > Credentials
+   - Create OAuth 2.0 Client ID
+   - Choose application type (Web, iOS, Android)
+
+2. **Configure Authorized Origins:**
+   - For Web: Add `http://localhost:8000`, `http://127.0.0.1:8000`
+   - For iOS: Add your iOS bundle identifier
+   - For Android: Add your Android package name
+
+3. **Set Environment Variable:**
+   ```env
+   GOOGLE_CLIENT_ID=your-google-oauth-client-id
+   ```
+
+### Apple OAuth Configuration
+
+1. **Create Apple OAuth Client:**
+   - Go to [Apple Developer Console](https://developer.apple.com/)
+   - Navigate to Certificates, Identifiers & Profiles
+   - Create Services ID for Sign In with Apple
+
+2. **Set Environment Variable:**
+   ```env
+   APPLE_CLIENT_ID=your-apple-client-id
+   ```
+
+### Testing OAuth Authentication
+
+#### Web Testing
+```bash
+# Start server with OAuth configuration
+export $(cat .env | xargs) && python -m uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+
+# Access demo frontend
+http://localhost:8000/demo
+```
+
+#### iOS Testing
+```swift
+// In your iOS app
+import GoogleSignIn
+
+// After Google Sign-In success
+let idToken = user.authentication.idToken
+
+// Send to backend
+let request = URLRequest(url: URL(string: "http://your-api.com/auth/google")!)
+request.httpMethod = "POST"
+request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+request.httpBody = try? JSONSerialization.data(withJSONObject: ["id_token": idToken])
+```
+
+#### Backend Testing
+```bash
+# Test Google auth endpoint
+curl -X POST http://localhost:8000/auth/google \
+  -H "Content-Type: application/json" \
+  -d '{"id_token": "test_token"}'
+
+# Expected: 401 Unauthorized (invalid token)
+# With real token: 200 OK with user data
 ```
 
 ## 🧪 Testing
@@ -263,6 +383,8 @@ The test suite includes:
 - ✅ User registration (success, validation, duplicates)
 - ✅ User login (success, invalid credentials)
 - ✅ Token refresh (success, invalid tokens)
+- ✅ Google authentication (missing/invalid tokens, client ID validation)
+- ✅ Apple authentication (missing/invalid tokens, client ID validation)
 - ✅ Complete authentication flows
 
 **User Profile Tests (`tests/test_users.py`):**
@@ -288,6 +410,8 @@ The test suite includes:
 ### Environment Variables
 - `DATABASE_URL`: PostgreSQL connection string
 - `SECRET_KEY`: JWT signing secret (change in production!)
+- `GOOGLE_CLIENT_ID`: Google OAuth 2.0 client ID for Google authentication
+- `APPLE_CLIENT_ID`: Apple OAuth client ID for Apple authentication
 - `DEBUG`: Enable/disable debug mode
 - `ACCESS_TOKEN_EXPIRE_MINUTES`: Access token lifetime (default: 60)
 - `REFRESH_TOKEN_EXPIRE_DAYS`: Refresh token lifetime (default: 30)
@@ -296,6 +420,8 @@ The test suite includes:
 - ✅ Password hashing with bcrypt
 - ✅ JWT tokens with expiration
 - ✅ Bearer token authentication
+- ✅ Google OAuth 2.0 integration with token verification
+- ✅ Apple OAuth integration with token verification
 - ✅ Input validation with Pydantic
 - ✅ SQL injection protection with SQLAlchemy
 - ✅ Rate limiting ready (add middleware)

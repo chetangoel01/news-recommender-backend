@@ -203,15 +203,8 @@ class ArticlesResponse(BaseModel):
     has_more: bool
     next_cursor: Optional[str] = None
 
-class ArticleViewRequest(BaseModel):
-    view_duration_seconds: float
-    percentage_read: Optional[int] = None
-    interaction_type: Optional[str] = None
-    swipe_direction: Optional[str] = None
-
-class ArticleViewResponse(BaseModel):
-    tracked: bool
-    updated_recommendations: bool
+# View tracking is now handled locally on the device
+# No server-side view tracking schemas needed
 
 class BookmarkResponse(BaseModel):
     bookmarked: bool
@@ -256,4 +249,70 @@ class ErrorResponse(BaseModel):
     code: str
     message: str
     details: Optional[ErrorDetail] = None
-    request_id: Optional[str] = None 
+    request_id: Optional[str] = None
+
+# Feed Schemas
+class EngagementPrediction(BaseModel):
+    likely_to_like: float
+    likely_to_share: float
+    likely_to_read_full: float
+
+class FeedArticle(BaseModel):
+    id: UUID
+    title: str
+    summary: Optional[str] = None
+    image_url: Optional[str] = None
+    source: Dict[str, Any]  # ArticleSource-like dict
+    recommendation_reason: Optional[str] = None
+    confidence_score: Optional[float] = None
+    position_score: Optional[float] = None
+    content_type: str = "article"
+    estimated_read_time: Optional[str] = None
+    engagement_prediction: Optional[EngagementPrediction] = None
+    published_at: Optional[datetime] = None
+    category: Optional[str] = None
+    # Trending-specific fields
+    trend_score: Optional[float] = None
+    trending_rank: Optional[int] = None
+    velocity: Optional[str] = None
+    engagement_metrics: Optional[Dict[str, Any]] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class FeedMetadata(BaseModel):
+    generated_at: datetime
+    algorithm_version: str
+    personalization_strength: float
+    diversity_score: float
+    cache_ttl_minutes: int
+
+class PersonalizedFeedResponse(BaseModel):
+    articles: List[FeedArticle]
+    feed_metadata: FeedMetadata
+    preload_next_batch: bool
+    next_cursor: Optional[str] = None
+    has_more: bool = False
+
+class TrendingTopic(BaseModel):
+    topic: str
+    mention_count: int
+    sentiment: str
+    trending_articles_count: int
+
+class TrendingFeedResponse(BaseModel):
+    articles: List[FeedArticle]
+    trending_topics: List[TrendingTopic]
+    next_cursor: Optional[str] = None
+    has_more: bool = False
+
+# Search Schemas
+class SearchMetadata(BaseModel):
+    query: str
+    total_results: int
+    search_time_ms: int
+    semantic_expansion: List[str] = []
+    suggested_filters: List[str] = []
+
+class SearchResponse(BaseModel):
+    articles: List[ArticleSummary]
+    search_metadata: SearchMetadata 

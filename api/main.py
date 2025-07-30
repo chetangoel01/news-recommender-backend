@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.routes import auth, users, articles
+from fastapi.responses import FileResponse
+from api.routes import auth, users, articles, feed, search
 
 app = FastAPI(
     title="News Recommender Backend API",
@@ -30,7 +31,7 @@ app = FastAPI(
     
     **For new users:** Try `/auth/register` first  
     **For existing users:** Try `/auth/login` first  
-    **Then:** Use the token to access `/articles`, `/users/profile`, etc.
+    **Then:** Use the token to access `/articles`, `/users/profile`, `/feed/personalized`, etc.
     """,
     version="1.0.0"
 )
@@ -81,6 +82,12 @@ app.include_router(users.router, prefix="/users", tags=["users"])
 # Include article content management routes
 app.include_router(articles.router, prefix="/articles", tags=["articles"])
 
+# Include feed routes
+app.include_router(feed.router, prefix="/feed", tags=["feed"])
+
+# Include search routes
+app.include_router(search.router, prefix="/search", tags=["search"])
+
 @app.get("/")
 def read_root():
     return {
@@ -92,3 +99,8 @@ def read_root():
 @app.get("/health")
 def health_check():
     return {"status": "healthy"}
+
+@app.get("/demo")
+def serve_demo_frontend():
+    """Serve the demo frontend HTML file"""
+    return FileResponse("demo-frontend.html")

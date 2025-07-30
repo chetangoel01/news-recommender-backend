@@ -5,7 +5,7 @@ A privacy-first news recommendation system with local ML computation, user authe
 ## 🚀 Features
 
 - **Privacy-First Architecture**: ML computations run locally on user devices
-- **User Authentication**: JWT-based auth with secure token management  
+- **User Authentication**: JWT-based auth with Google & Apple OAuth support  
 - **Personalized Recommendations**: Vector-based content matching with user embeddings
 - **Semantic Search**: pgvector-powered similarity search across news articles
 - **Real-time Sync**: Efficient embedding updates from local device computation
@@ -15,7 +15,7 @@ A privacy-first news recommendation system with local ML computation, user authe
 
 - **Backend**: FastAPI with async support
 - **Database**: PostgreSQL with pgvector extension (Supabase)
-- **Authentication**: JWT tokens with bcrypt password hashing
+- **Authentication**: JWT tokens with bcrypt password hashing & OAuth integration
 - **ML/Embeddings**: sentence-transformers (`all-MiniLM-L6-v2`)
 - **Testing**: pytest with production database testing
 - **Deployment**: Containerized with Docker support
@@ -131,7 +131,7 @@ This system implements a **privacy-first recommendation architecture**:
 
 The project features **production-grade testing** with 43 comprehensive tests:
 
-- ✅ **Authentication Flow**: Registration, login, token management
+- ✅ **Authentication Flow**: Registration, login, OAuth (Google/Apple), token management
 - ✅ **User Profiles**: Profile management and preferences  
 - ✅ **Embedding Updates**: Local ML computation workflow
 - ✅ **Database Integration**: Real PostgreSQL with pgvector

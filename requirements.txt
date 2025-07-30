@@ -20,6 +20,7 @@ SQLAlchemy
 # Authentication dependencies
 python-jose[cryptography]
 passlib[bcrypt]
+bcrypt==4.0.1
 python-multipart
 email-validator
 # Testing dependencies
@@ -28,3 +29,4 @@ pytest-asyncio
 httpx
 pytest-mock
 pytest-cov
+pyjwt
