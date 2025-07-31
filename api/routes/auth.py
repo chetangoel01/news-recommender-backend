@@ -160,8 +160,52 @@ async def refresh_token(token_data: TokenRefresh, db: Session = Depends(get_db))
 async def google_auth(request: Request, db: Session = Depends(get_db)):
     data = await request.json()
     id_token = data.get("id_token")
+    supabase_user_id = data.get("supabase_user_id")
+    
     if not id_token:
         raise HTTPException(status_code=400, detail="Missing id_token")
+    
+    # If we have a Supabase user ID, use that for authentication
+    if supabase_user_id:
+        email = data.get("email")
+        display_name = data.get("display_name")
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Missing email")
+        
+        # Try to find user by email
+        user = get_user_by_email(db, email)
+        if not user:
+            # Create a new user with Supabase user ID
+            import uuid
+            username = f"supabase_{supabase_user_id[:8]}"
+            user_dict = {
+                "email": email,
+                "username": username,
+                "display_name": display_name or username,
+                "password": uuid.uuid4().hex,  # random password, not used
+                "preferences": {"categories": ["technology"], "language": "en", "content_type": "mixed"}
+            }
+            user = create_user(db, user_dict)
+        
+        access_token = create_access_token(
+            data={"sub": user.username},
+            expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        )
+        refresh_token = create_refresh_token(data={"sub": user.username})
+        return UserLoginResponse(
+            user_id=user.id,
+            access_token=access_token,
+            refresh_token=refresh_token,
+            expires_in=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+            user_profile=UserProfile(
+                username=user.username,
+                display_name=user.display_name,
+                profile_image=user.profile_image
+            )
+        )
+    
+    # Fallback to original Google token verification
     payload = verify_google_id_token(id_token, GOOGLE_CLIENT_ID)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid Google token")
