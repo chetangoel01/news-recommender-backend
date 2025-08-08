@@ -41,6 +41,7 @@ class User(Base):
     shares = relationship("Share", back_populates="user", cascade="all, delete-orphan")
     bookmarks = relationship("Bookmark", back_populates="user", cascade="all, delete-orphan")
     embedding_updates = relationship("UserEmbeddingUpdate", back_populates="user", cascade="all, delete-orphan")
+    article_interactions = relationship("UserArticleInteraction", back_populates="user", cascade="all, delete-orphan")
 
 class Article(Base):
     __tablename__ = "articles"
@@ -137,3 +138,18 @@ class UserEmbeddingUpdate(Base):
     
     # Relationships
     user = relationship("User", back_populates="embedding_updates")
+
+class UserArticleInteraction(Base):
+    __tablename__ = "user_article_interactions"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid())
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    article_id = Column(UUID(as_uuid=True), ForeignKey("articles.id"), nullable=False)
+    interaction_type = Column(String(20), nullable=False)  # 'view', 'like', 'share', 'bookmark', 'skip'
+    read_time_seconds = Column(Integer, nullable=True)
+    interaction_strength = Column(Float, default=1.0)
+    created_at = Column(DateTime, server_default=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="article_interactions")
+    article = relationship("Article")

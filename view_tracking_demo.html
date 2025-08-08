@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Tracking Demo - News Recommender</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            border: 2px solid #f0f0f0;
+            border-radius: 15px;
+            background: #fafafa;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .article-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .article-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .article-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .article-card p {
+            color: #666;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .article-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .article-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .interaction-log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-radius: 4px;
+        }
+
+        .log-entry.view {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .log-entry.skip {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .log-entry.like {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 View Tracking Demo</h1>
+            <p>Test the duplicate prevention system with real user interactions</p>
+        </div>
+
+        <div class="content">
+            <!-- Login Section -->
+            <div class="section" id="loginSection">
+                <h2>🔐 Authentication</h2>
+                <div class="form-group">
+                    <label for="email">Email:</label>
+                    <input type="email" id="email" placeholder="user@example.com" value="demo@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" placeholder="Password" value="demo123">
+                </div>
+                <button class="btn" onclick="login()">Login</button>
+                <button class="btn btn-secondary" onclick="register()">Register</button>
+                <div id="loginStatus"></div>
+            </div>
+
+            <!-- Demo Controls -->
+            <div class="section hidden" id="demoSection">
+                <h2>🎮 Demo Controls</h2>
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="articlesViewed">0</div>
+                        <div class="stat-label">Articles Viewed</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="articlesSkipped">0</div>
+                        <div class="stat-label">Articles Skipped</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="articlesLiked">0</div>
+                        <div class="stat-label">Articles Liked</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalInteractions">0</div>
+                        <div class="stat-label">Total Interactions</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="currentPage">0</div>
+                        <div class="stat-label">Current Page</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalPages">0</div>
+                        <div class="stat-label">Total Pages</div>
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="loadArticles()">Load First Page</button>
+                <button class="btn btn-secondary" onclick="resetDemo()">Reset Demo</button>
+                <button class="btn btn-warning" onclick="testDuplicatePrevention()">Test Duplicate Prevention</button>
+                <button class="btn btn-success" onclick="showStats()">Show Statistics</button>
+            </div>
+
+            <!-- Current Article -->
+            <div class="section hidden" id="articleSection">
+                <h2>📰 Current Article</h2>
+                <div id="currentArticle"></div>
+                <div class="article-actions">
+                    <button class="btn btn-success" onclick="viewArticle()">👁️ View Article</button>
+                    <button class="btn btn-warning" onclick="skipArticle()">⏭️ Skip Article</button>
+                    <button class="btn" onclick="likeArticle()">❤️ Like Article</button>
+                    <button class="btn btn-secondary" onclick="nextArticle()">➡️ Next Article</button>
+                </div>
+                
+                <!-- Pagination Controls -->
+                <div style="margin-top: 20px; text-align: center;">
+                    <h3>📄 Pagination Controls</h3>
+                    <div style="display: flex; justify-content: center; gap: 10px; margin: 15px 0;">
+                        <button class="btn btn-secondary" onclick="loadPreviousPage()" id="prevPageBtn" disabled>⬅️ Previous Page</button>
+                        <button class="btn" onclick="loadNextPage()" id="nextPageBtn">Next Page ➡️</button>
+                    </div>
+                    <div style="font-size: 0.9rem; color: #666;">
+                        <span id="pageInfo">Page 0 of 0</span> | 
+                        <span id="cursorInfo">Cursor: None</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interaction Log -->
+            <div class="section hidden" id="logSection">
+                <h2>📊 Interaction Log</h2>
+                <div class="interaction-log" id="interactionLog"></div>
+            </div>
+
+            <!-- Test Results -->
+            <div class="section hidden" id="testSection">
+                <h2>🧪 Test Results</h2>
+                <div id="testResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let authToken = null;
+        let currentUser = null;
+        let articles = [];
+        let currentArticleIndex = 0;
+        let viewedArticles = new Set();
+        let skippedArticles = new Set();
+        let likedArticles = new Set();
+        let interactionLog = [];
+        
+        // Pagination variables
+        let currentCursor = null;
+        let hasNextPage = true;
+        let hasPreviousPage = false;
+        let pageHistory = [];
+        let currentPageIndex = -1;
+
+        // API Base URL
+        const API_BASE_URL = 'http://localhost:8000';
+
+        // Utility functions
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('loginStatus');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+        }
+
+        function logInteraction(action, articleId, details = '') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                timestamp,
+                action,
+                articleId,
+                details
+            };
+            interactionLog.push(logEntry);
+            updateInteractionLog();
+            updateStats();
+        }
+
+        function updateInteractionLog() {
+            const logDiv = document.getElementById('interactionLog');
+            logDiv.innerHTML = interactionLog.map(entry => 
+                `<div class="log-entry ${entry.action}">
+                    [${entry.timestamp}] ${entry.action.toUpperCase()}: ${entry.articleId} ${entry.details}
+                </div>`
+            ).join('');
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStats() {
+            document.getElementById('articlesViewed').textContent = viewedArticles.size;
+            document.getElementById('articlesSkipped').textContent = skippedArticles.size;
+            document.getElementById('articlesLiked').textContent = likedArticles.size;
+            document.getElementById('totalInteractions').textContent = interactionLog.length;
+            document.getElementById('currentPage').textContent = currentPageIndex + 1;
+            document.getElementById('totalPages').textContent = pageHistory.length;
+        }
+
+        // Authentication functions
+        async function login() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                showStatus('Logging in...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    authToken = data.access_token;
+                    currentUser = data.user;
+                    showStatus('Login successful!', 'success');
+                    
+                    // Show demo section
+                    document.getElementById('loginSection').classList.add('hidden');
+                    document.getElementById('demoSection').classList.remove('hidden');
+                    document.getElementById('articleSection').classList.remove('hidden');
+                    document.getElementById('logSection').classList.remove('hidden');
+                    
+                    logInteraction('login', 'system', `User: ${currentUser.username}`);
+                } else {
+                    showStatus(`Login failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Login error: ${error.message}`, 'error');
+            }
+        }
+
+        async function register() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const username = email.split('@')[0];
+
+            try {
+                showStatus('Registering...', 'info');
+                
+                const response = await fetch(`${API_BASE_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        username,
+                        display_name: username
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showStatus('Registration successful! Please login.', 'success');
+                } else {
+                    showStatus(`Registration failed: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Registration error: ${error.message}`, 'error');
+            }
+        }
+
+        // Article functions
+        async function loadArticles(cursor = null) {
+            try {
+                showStatus('Loading articles...', 'info');
+                
+                let url = `${API_BASE_URL}/feed/personalized?limit=10`;
+                if (cursor) {
+                    url += `&cursor=${encodeURIComponent(cursor)}`;
+                }
+                
+                const response = await fetch(url, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    articles = data.articles;
+                    currentArticleIndex = 0;
+                    currentCursor = data.next_cursor;
+                    hasNextPage = !!data.next_cursor;
+                    
+                    // Add to page history
+                    if (cursor === null) {
+                        // First page
+                        pageHistory = [{
+                            cursor: null,
+                            articles: [...articles],
+                            timestamp: Date.now()
+                        }];
+                        currentPageIndex = 0;
+                    } else {
+                        // Next page
+                        pageHistory.push({
+                            cursor: cursor,
+                            articles: [...articles],
+                            timestamp: Date.now()
+                        });
+                        currentPageIndex = pageHistory.length - 1;
+                    }
+                    
+                    hasPreviousPage = currentPageIndex > 0;
+                    
+                    showStatus(`Loaded ${articles.length} articles`, 'success');
+                    updatePaginationControls();
+                    
+                    if (articles.length > 0) {
+                        displayCurrentArticle();
+                    }
+                    
+                    logInteraction('load_articles', 'system', `Loaded ${articles.length} articles with cursor: ${cursor || 'null'}`);
+                } else {
+                    showStatus(`Failed to load articles: ${data.detail}`, 'error');
+                }
+            } catch (error) {
+                showStatus(`Error loading articles: ${error.message}`, 'error');
+            }
+        }
+
+        function displayCurrentArticle() {
+            if (currentArticleIndex >= articles.length) {
+                document.getElementById('currentArticle').innerHTML = '<p>No more articles available!</p>';
+                return;
+            }
+
+            const article = articles[currentArticleIndex];
+            const articleDiv = document.getElementById('currentArticle');
+            
+            articleDiv.innerHTML = `
+                <div class="article-card">
+                    <div class="article-meta">
+                        <span>📰 ${article.source?.name || 'Unknown Source'}</span>
+                        <span>📅 ${new Date(article.published_at).toLocaleDateString()}</span>
+                    </div>
+                    <h3>${article.title}</h3>
+                    <p>${article.summary}</p>
+                    <div class="article-meta">
+                        <span>👁️ ${article.engagement?.views || 0} views</span>
+                        <span>❤️ ${article.engagement?.likes || 0} likes</span>
+                        <span>📤 ${article.engagement?.shares || 0} shares</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${(currentArticleIndex + 1) / articles.length * 100}%"></div>
+                    </div>
+                    <small>Article ${currentArticleIndex + 1} of ${articles.length} | Page ${currentPageIndex + 1}</small>
+                </div>
+            `;
+        }
+
+        async function viewArticle() {
+            if (currentArticleIndex >= articles.length) return;
+            
+            const article = articles[currentArticleIndex];
+            const articleId = article.id;
+            
+            try {
+                // Track the view
+                const response = await fetch(`${API_BASE_URL}/articles/${articleId}/view`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        read_time_seconds: 45,
+                        interaction_type: 'view',
+                        interaction_strength: 1.0
+                    })
+                });
+
+                if (response.ok) {
+                    viewedArticles.add(articleId);
+                    logInteraction('view', articleId, `Read for 45 seconds`);
+                    showStatus('Article viewed and tracked!', 'success');
+                } else {
+                    showStatus('Failed to track view', 'error');
+                }
+            } catch (error) {
+                showStatus(`Error tracking view: ${error.message}`, 'error');
+            }
+        }
+
+        async function skipArticle() {
+            if (currentArticleIndex >= articles.length) return;
+            
+            const article = articles[currentArticleIndex];
+            const articleId = article.id;
+            
+            try {
+                // Track the skip
+                const response = await fetch(`${API_BASE_URL}/articles/${articleId}/view`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify({
+                        read_time_seconds: 0,
+                        interaction_type: 'skip',
+                        interaction_strength: 0.5
+                    })
+                });
+
+                if (response.ok) {
+                    skippedArticles.add(articleId);
+                    logInteraction('skip', articleId, 'Skipped immediately');
+                    showStatus('Article skipped and tracked!', 'success');
+                } else {
+                    showStatus('Failed to track skip', 'error');
+                }
+            } catch (error) {
+                showStatus(`Error tracking skip: ${error.message}`, 'error');
+            }
+        }
+
+        async function likeArticle() {
+            if (currentArticleIndex >= articles.length) return;
+            
+            const article = articles[currentArticleIndex];
+            const articleId = article.id;
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/articles/${articleId}/like`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                if (response.ok) {
+                    likedArticles.add(articleId);
+                    logInteraction('like', articleId, 'Liked article');
+                    showStatus('Article liked!', 'success');
+                } else {
+                    showStatus('Failed to like article', 'error');
+                }
+            } catch (error) {
+                showStatus(`Error liking article: ${error.message}`, 'error');
+            }
+        }
+
+        function nextArticle() {
+            currentArticleIndex++;
+            displayCurrentArticle();
+            logInteraction('next', 'system', `Moved to article ${currentArticleIndex + 1}`);
+        }
+
+        // Pagination functions
+        async function loadNextPage() {
+            if (!hasNextPage) {
+                showStatus('No more pages available', 'info');
+                return;
+            }
+            
+            try {
+                await loadArticles(currentCursor);
+                logInteraction('next_page', 'system', `Loaded page ${currentPageIndex + 1}`);
+            } catch (error) {
+                showStatus(`Error loading next page: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadPreviousPage() {
+            if (!hasPreviousPage) {
+                showStatus('No previous page available', 'info');
+                return;
+            }
+            
+            try {
+                currentPageIndex--;
+                const previousPage = pageHistory[currentPageIndex];
+                articles = [...previousPage.articles];
+                currentArticleIndex = 0;
+                hasPreviousPage = currentPageIndex > 0;
+                hasNextPage = currentPageIndex < pageHistory.length - 1;
+                
+                updatePaginationControls();
+                displayCurrentArticle();
+                logInteraction('prev_page', 'system', `Loaded page ${currentPageIndex + 1}`);
+            } catch (error) {
+                showStatus(`Error loading previous page: ${error.message}`, 'error');
+            }
+        }
+
+        function updatePaginationControls() {
+            const prevBtn = document.getElementById('prevPageBtn');
+            const nextBtn = document.getElementById('nextPageBtn');
+            const pageInfo = document.getElementById('pageInfo');
+            const cursorInfo = document.getElementById('cursorInfo');
+            
+            prevBtn.disabled = !hasPreviousPage;
+            nextBtn.disabled = !hasNextPage;
+            
+            pageInfo.textContent = `Page ${currentPageIndex + 1} of ${pageHistory.length}`;
+            cursorInfo.textContent = `Cursor: ${currentCursor ? currentCursor.substring(0, 20) + '...' : 'None'}`;
+        }
+
+        // Demo functions
+        function resetDemo() {
+            viewedArticles.clear();
+            skippedArticles.clear();
+            likedArticles.clear();
+            interactionLog = [];
+            currentArticleIndex = 0;
+            
+            // Reset pagination
+            currentCursor = null;
+            hasNextPage = true;
+            hasPreviousPage = false;
+            pageHistory = [];
+            currentPageIndex = -1;
+            
+            updateStats();
+            updateInteractionLog();
+            updatePaginationControls();
+            displayCurrentArticle();
+            
+            showStatus('Demo reset!', 'success');
+            logInteraction('reset', 'system', 'Demo reset');
+        }
+
+        async function testDuplicatePrevention() {
+            try {
+                showStatus('Testing duplicate prevention...', 'info');
+                
+                // Load articles again to see if viewed ones are excluded
+                const response = await fetch(`${API_BASE_URL}/feed/personalized?limit=10`, {
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const newArticles = data.articles;
+                    const newArticleIds = new Set(newArticles.map(a => a.id));
+                    
+                    // Check for duplicates
+                    const duplicates = [];
+                    for (const viewedId of viewedArticles) {
+                        if (newArticleIds.has(viewedId)) {
+                            duplicates.push(viewedId);
+                        }
+                    }
+
+                    // Test across all pages in history
+                    let totalDuplicates = duplicates.length;
+                    let totalArticlesChecked = newArticles.length;
+                    
+                    for (const page of pageHistory) {
+                        for (const article of page.articles) {
+                            if (viewedArticles.has(article.id)) {
+                                totalDuplicates++;
+                            }
+                            totalArticlesChecked++;
+                        }
+                    }
+
+                    const resultsDiv = document.getElementById('testResults');
+                    resultsDiv.innerHTML = `
+                        <div class="status ${totalDuplicates === 0 ? 'success' : 'error'}">
+                            <h3>Duplicate Prevention Test Results:</h3>
+                            <p><strong>Viewed Articles:</strong> ${viewedArticles.size}</p>
+                            <p><strong>Pages Loaded:</strong> ${pageHistory.length}</p>
+                            <p><strong>Total Articles Checked:</strong> ${totalArticlesChecked}</p>
+                            <p><strong>Duplicates Found:</strong> ${totalDuplicates}</p>
+                            ${totalDuplicates > 0 ? `<p><strong>Duplicate IDs:</strong> ${duplicates.join(', ')}</p>` : ''}
+                            <p><strong>Status:</strong> ${totalDuplicates === 0 ? '✅ PASSED - No duplicates found!' : '❌ FAILED - Duplicates found!'}</p>
+                        </div>
+                    `;
+                    
+                    document.getElementById('testSection').classList.remove('hidden');
+                    showStatus(`Test completed! ${totalDuplicates === 0 ? 'No duplicates found!' : 'Duplicates found!'}`, totalDuplicates === 0 ? 'success' : 'error');
+                    
+                    logInteraction('test', 'system', `Duplicate test: ${totalDuplicates} duplicates found across ${pageHistory.length} pages`);
+                } else {
+                    showStatus('Failed to test duplicate prevention', 'error');
+                }
+            } catch (error) {
+                showStatus(`Error testing duplicate prevention: ${error.message}`, 'error');
+            }
+        }
+
+        function showStats() {
+            const statsDiv = document.getElementById('testResults');
+            statsDiv.innerHTML = `
+                <div class="status info">
+                    <h3>📊 Interaction Statistics:</h3>
+                    <p><strong>Total Interactions:</strong> ${interactionLog.length}</p>
+                    <p><strong>Articles Viewed:</strong> ${viewedArticles.size}</p>
+                    <p><strong>Articles Skipped:</strong> ${skippedArticles.size}</p>
+                    <p><strong>Articles Liked:</strong> ${likedArticles.size}</p>
+                    <p><strong>Current Article Index:</strong> ${currentArticleIndex + 1} of ${articles.length}</p>
+                    <p><strong>Pages Loaded:</strong> ${pageHistory.length}</p>
+                    <p><strong>Current Page:</strong> ${currentPageIndex + 1}</p>
+                    <p><strong>Has Next Page:</strong> ${hasNextPage ? 'Yes' : 'No'}</p>
+                    <p><strong>Has Previous Page:</strong> ${hasPreviousPage ? 'Yes' : 'No'}</p>
+                    <p><strong>Session Duration:</strong> ${Math.floor((Date.now() - sessionStartTime) / 1000)} seconds</p>
+                </div>
+            `;
+            
+            document.getElementById('testSection').classList.remove('hidden');
+            showStatus('Statistics displayed!', 'success');
+        }
+
+        // Initialize
+        const sessionStartTime = Date.now();
+        updateStats();
+    </script>
+</body>
+</html> 

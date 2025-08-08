@@ -1,13 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc, func, and_, or_, text
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone, timedelta
 import uuid
 
 from core.db import get_db
 from core.auth import get_current_active_user
-from core.models import User, Article, Bookmark, Like, Share
+from core.models import User, Article, Bookmark, Like, Share, UserArticleInteraction
 from core.schemas import (
     ArticlesResponse,
     ArticleDetail,
@@ -649,4 +649,90 @@ async def get_similar_articles(
             detail="Failed to find similar articles"
         )
 
- 
+@router.post("/{article_id}/view", response_model=Dict[str, Any])
+async def track_article_view(
+    article_id: str,
+    view_data: Dict[str, Any] = Body(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Track article view interaction.
+    
+    Records when a user views an article, including read time and interaction strength.
+    This helps prevent showing the same articles again in recommendations.
+    """
+    try:
+        # Parse article ID
+        try:
+            article_uuid = uuid.UUID(article_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid article ID format"
+            )
+        
+        # Get article
+        article = db.query(Article).filter(Article.id == article_uuid).first()
+        if not article:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Article not found"
+            )
+        
+        # Extract view data
+        read_time_seconds = view_data.get("read_time_seconds", 0)
+        interaction_strength = view_data.get("interaction_strength", 1.0)
+        interaction_type = view_data.get("interaction_type", "view")
+        
+        # Check if interaction already exists
+        existing_interaction = db.query(UserArticleInteraction).filter(
+            and_(
+                UserArticleInteraction.user_id == current_user.id,
+                UserArticleInteraction.article_id == article_uuid,
+                UserArticleInteraction.interaction_type == interaction_type
+            )
+        ).first()
+        
+        if existing_interaction:
+            # Update existing interaction
+            existing_interaction.read_time_seconds = max(
+                existing_interaction.read_time_seconds or 0, 
+                read_time_seconds
+            )
+            existing_interaction.interaction_strength = max(
+                existing_interaction.interaction_strength, 
+                interaction_strength
+            )
+            existing_interaction.created_at = datetime.now(timezone.utc)
+        else:
+            # Create new interaction
+            interaction = UserArticleInteraction(
+                user_id=current_user.id,
+                article_id=article_uuid,
+                interaction_type=interaction_type,
+                read_time_seconds=read_time_seconds,
+                interaction_strength=interaction_strength,
+                created_at=datetime.now(timezone.utc)
+            )
+            db.add(interaction)
+        
+        # Increment article view count
+        article.views = (article.views or 0) + 1
+        db.commit()
+        
+        return {
+            "tracked": True,
+            "article_id": str(article_uuid),
+            "interaction_type": interaction_type,
+            "read_time_seconds": read_time_seconds,
+            "interaction_strength": interaction_strength
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to track article view: {str(e)}"
+        )

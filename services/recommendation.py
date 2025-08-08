@@ -10,7 +10,7 @@ import hashlib
 import json
 from functools import lru_cache
 
-from core.models import User, Article, Like, Share, Bookmark, UserEmbeddingUpdate
+from core.models import User, Article, Like, Share, Bookmark, UserEmbeddingUpdate, UserArticleInteraction
 
 class RecommendationService:
     def __init__(self, db: Session):
@@ -154,7 +154,7 @@ class RecommendationService:
         """Get recommendations based on preferred categories."""
         query = self.db.query(Article).filter(
             Article.category.in_(categories),
-            Article.published_at >= datetime.now(timezone.utc) - timedelta(days=14)
+            Article.published_at >= datetime.now(timezone.utc) - timedelta(days=90)  # Extended from 14 to 90 days
         )
         
         if exclude_ids:
@@ -528,7 +528,17 @@ class RecommendationService:
             ).all()
             exclude_ids.extend([str(bookmark.article_id) for bookmark in recent_bookmarks])
             
-            # 2. Articles with explicit positive feedback
+            # 2. NEW: Recent article views and interactions
+            recent_views = self.db.query(UserArticleInteraction.article_id).filter(
+                and_(
+                    UserArticleInteraction.user_id == user_id,
+                    UserArticleInteraction.interaction_type.in_(['view', 'skip']),
+                    UserArticleInteraction.created_at >= interaction_cutoff
+                )
+            ).all()
+            exclude_ids.extend([str(view.article_id) for view in recent_views])
+            
+            # 3. Articles with explicit positive feedback (longer window)
             positive_interactions = self.db.query(Like.article_id).filter(
                 and_(
                     Like.user_id == user_id,
@@ -537,11 +547,21 @@ class RecommendationService:
             ).all()
             exclude_ids.extend([str(like.article_id) for like in positive_interactions])
             
+            # 4. NEW: All-time viewed articles (prevent showing articles user has seen)
+            all_time_views = self.db.query(UserArticleInteraction.article_id).filter(
+                and_(
+                    UserArticleInteraction.user_id == user_id,
+                    UserArticleInteraction.interaction_type == 'view',
+                    UserArticleInteraction.created_at >= all_time_cutoff
+                )
+            ).all()
+            exclude_ids.extend([str(view.article_id) for view in all_time_views])
+            
             # Remove duplicates and return
             unique_exclude_ids = list(set(exclude_ids))
             
             print(f"🔍 RecommendationService: Excluding {len(unique_exclude_ids)} articles for user {user_id} (force_fresh: {force_fresh})")
-            print(f"🔍 RecommendationService: Breakdown - Recent interactions: {len(recent_likes) + len(recent_shares) + len(recent_bookmarks)}, Positive interactions: {len(positive_interactions)}")
+            print(f"🔍 RecommendationService: Breakdown - Recent interactions: {len(recent_likes) + len(recent_shares) + len(recent_bookmarks)}, Recent views: {len(recent_views)}, All-time views: {len(all_time_views)}")
             
             return unique_exclude_ids
             
@@ -565,26 +585,57 @@ class RecommendationService:
     def _get_diverse_trending_fallback(self, limit: int, cursor: Optional[str] = None, exclude_ids: List[str] = None) -> List[Tuple[Article, Dict[str, Any]]]:
         """Get diverse trending articles as fallback with proper pagination."""
         try:
-            # Get articles from different categories
+            # Get articles from different categories - extended time window for sparse data
             categories_query = self.db.query(func.distinct(Article.category)).filter(
                 Article.category.isnot(None),
-                Article.published_at >= datetime.now(timezone.utc) - timedelta(days=14)
+                Article.published_at >= datetime.now(timezone.utc) - timedelta(days=90)  # Extended from 14 to 90 days
             ).all()
             
             categories = [cat[0] for cat in categories_query if cat[0]]
             
-            if not categories:
-                # No categories available, get general trending
-                return self._get_general_trending_fallback(limit, cursor, exclude_ids)
-            
-            # Get articles from each category
-            articles_per_category = max(1, limit // len(categories))
             diverse_articles = []
             
-            for category in categories:
+            # First try to get articles from each category
+            if categories:
+                articles_per_category = max(1, limit // len(categories))
+                
+                for category in categories:
+                    query = self.db.query(Article).filter(
+                        Article.category == category,
+                        Article.published_at >= datetime.now(timezone.utc) - timedelta(days=90)  # Extended from 14 to 90 days
+                    )
+                    
+                    # Apply exclusion filter
+                    if exclude_ids:
+                        try:
+                            import uuid
+                            exclude_uuids = [uuid.UUID(article_id) for article_id in exclude_ids]
+                            query = query.filter(~Article.id.in_(exclude_uuids))
+                            print(f"🔍 RecommendationService: Excluding {len(exclude_uuids)} articles from diverse trending fallback")
+                        except Exception as e:
+                            print(f"🔍 Error converting exclusion IDs to UUIDs in diverse trending: {e}")
+                            query = query.filter(~Article.id.in_(exclude_ids))
+                    
+                    # Apply cursor pagination
+                    if cursor:
+                        query = self._apply_simple_cursor_pagination(query, cursor)
+                    
+                    cat_articles = query.order_by(
+                        desc(Article.views + func.coalesce(Article.likes, 0) * 10),
+                        func.random(),  # Add randomization
+                        Article.id
+                    ).limit(articles_per_category).all()
+                    
+                    diverse_articles.extend(cat_articles)
+            
+            # If we don't have enough articles from categories, add uncategorized articles
+            if len(diverse_articles) < limit:
+                remaining_needed = limit - len(diverse_articles)
+                print(f"🔍 RecommendationService: Only found {len(diverse_articles)} categorized articles, adding {remaining_needed} uncategorized articles")
+                
                 query = self.db.query(Article).filter(
-                    Article.category == category,
-                    Article.published_at >= datetime.now(timezone.utc) - timedelta(days=14)
+                    Article.category.is_(None),  # Uncategorized articles
+                    Article.published_at >= datetime.now(timezone.utc) - timedelta(days=90)
                 )
                 
                 # Apply exclusion filter
@@ -593,22 +644,26 @@ class RecommendationService:
                         import uuid
                         exclude_uuids = [uuid.UUID(article_id) for article_id in exclude_ids]
                         query = query.filter(~Article.id.in_(exclude_uuids))
-                        print(f"🔍 RecommendationService: Excluding {len(exclude_uuids)} articles from diverse trending fallback")
                     except Exception as e:
-                        print(f"🔍 Error converting exclusion IDs to UUIDs in diverse trending: {e}")
+                        print(f"🔍 Error converting exclusion IDs to UUIDs in uncategorized query: {e}")
                         query = query.filter(~Article.id.in_(exclude_ids))
                 
                 # Apply cursor pagination
                 if cursor:
                     query = self._apply_simple_cursor_pagination(query, cursor)
                 
-                cat_articles = query.order_by(
+                uncategorized_articles = query.order_by(
                     desc(Article.views + func.coalesce(Article.likes, 0) * 10),
                     func.random(),  # Add randomization
                     Article.id
-                ).limit(articles_per_category).all()
+                ).limit(remaining_needed).all()
                 
-                diverse_articles.extend(cat_articles)
+                diverse_articles.extend(uncategorized_articles)
+            
+            # If still no articles, fall back to general trending
+            if not diverse_articles:
+                print(f"🔍 RecommendationService: No diverse articles found, falling back to general trending")
+                return self._get_general_trending_fallback(limit, cursor, exclude_ids)
             
             # Shuffle and limit
             random.shuffle(diverse_articles)
@@ -617,8 +672,9 @@ class RecommendationService:
             # Format as recommendations
             recommendations = []
             for i, article in enumerate(diverse_articles):
+                category_label = article.category if article.category else "general"
                 metadata = {
-                    "reason": f"Trending in {article.category}" if article.category else "Trending article",
+                    "reason": f"Trending in {category_label}" if article.category else "Trending article",
                     "confidence": 0.6,
                     "position_score": 1.0 - (i * 0.01),
                     "scores": {"popularity_score": 0.8, "diversity_score": 0.9}
@@ -780,7 +836,15 @@ class RecommendationService:
             return 0.3  # Default moderate score
         
         now = datetime.now(timezone.utc)
-        hours_old = (now - article.published_at).total_seconds() / 3600
+        
+        # Ensure published_at is timezone-aware
+        if article.published_at.tzinfo is None:
+            # Assume UTC if no timezone info
+            published_at = article.published_at.replace(tzinfo=timezone.utc)
+        else:
+            published_at = article.published_at
+        
+        hours_old = (now - published_at).total_seconds() / 3600
         
         # Exponential decay: newer articles get higher scores (14 day half-life for sparse data)
         freshness = np.exp(-hours_old / (14 * 24))  # 14 days half-life

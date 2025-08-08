@@ -64,14 +64,14 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# Add CORS middleware for frontend access
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Configure properly for production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS disabled for development
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],  # Configure properly for production
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
 
 # Include authentication routes
 app.include_router(auth.router, prefix="/auth", tags=["authentication"])
@@ -104,3 +104,8 @@ def health_check():
 def serve_demo_frontend():
     """Serve the demo frontend HTML file"""
     return FileResponse("demo-frontend.html")
+
+@app.get("/view-tracking-demo")
+def serve_view_tracking_demo():
+    """Serve the view tracking demo HTML file"""
+    return FileResponse("view_tracking_demo.html")
