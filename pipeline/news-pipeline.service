@@ -1,0 +1,28 @@
+[Unit]
+Description=News Recommender Pipeline Scheduler
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=news-recommender
+Group=news-recommender
+WorkingDirectory=/opt/news-recommender-backend
+Environment=PYTHONPATH=/opt/news-recommender-backend
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/news-recommender-backend/venv/bin/python pipeline/continuous_scheduler.py --daemon --interval-hours 12
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=news-pipeline
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/news-recommender-backend/pipeline/logs
+
+[Install]
+WantedBy=multi-user.target 

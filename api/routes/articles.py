@@ -663,6 +663,9 @@ async def track_article_view(
     This helps prevent showing the same articles again in recommendations.
     """
     try:
+        print(f"🔍 View tracking request - Article ID: {article_id}")
+        print(f"🔍 View data received: {view_data}")
+        print(f"🔍 Current user: {current_user.id}")
         # Parse article ID
         try:
             article_uuid = uuid.UUID(article_id)
@@ -675,9 +678,10 @@ async def track_article_view(
         # Get article
         article = db.query(Article).filter(Article.id == article_uuid).first()
         if not article:
+            print(f"❌ Article not found: {article_uuid}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Article not found"
+                detail=f"Article not found: {article_id}"
             )
         
         # Extract view data
@@ -732,6 +736,9 @@ async def track_article_view(
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
+        print(f"❌ View tracking error: {str(e)}")
+        print(f"📋 Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to track article view: {str(e)}"
